@@ -170,3 +170,17 @@ pub fn xp_float(n: f64, ev: Option<&web_sys::MouseEvent>) {
 pub fn pct(frac: f64) -> String {
     format!("{}%", (clamp(frac, 0.0, 1.0) * 100.0).round())
 }
+
+/// `await sleep(ms)`.
+pub async fn sleep(ms: i32) {
+    let p = js_sys::Promise::new(&mut |res, _| {
+        let _ = window().set_timeout_with_callback_and_timeout_and_arguments_0(&res, ms);
+    });
+    let _ = wasm_bindgen_futures::JsFuture::from(p).await;
+}
+
+/// Forces a style flush (`void el.getBoundingClientRect()`), so a CSS
+/// transition starts from the values just set.
+pub fn reflow(el: &web_sys::Element) {
+    let _ = el.get_bounding_client_rect();
+}

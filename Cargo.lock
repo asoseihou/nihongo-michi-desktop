@@ -2705,6 +2705,7 @@ dependencies = [
  "js-sys",
  "leptos",
  "michi-core",
+ "send_wrapper",
  "serde",
  "serde_json",
  "wasm-bindgen",

@@ -16,11 +16,14 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 console_error_panic_hook = "0.1"
+send_wrapper = "0.6"
 web-sys = { version = "0.3", features = [
   "Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlSelectElement",
   "HtmlTextAreaElement", "Location", "History", "Event", "EventTarget", "KeyboardEvent", "MouseEvent",
   "PointerEvent", "DomRect", "Storage", "Response", "RequestInit", "Request", "Headers",
   "SpeechSynthesis", "SpeechSynthesisUtterance", "SpeechSynthesisVoice", "SpeechSynthesisEvent",
   "ScrollIntoViewOptions", "ScrollLogicalPosition", "ScrollToOptions", "CssStyleDeclaration",
-  "DomTokenList", "Performance", "VisibilityState", "FileList", "File", "Blob", "HtmlCollection", "NodeList", "Node",
+  "DomTokenList", "Performance", "VisibilityState",
+  "SvgElement", "SvgGraphicsElement", "SvgGeometryElement", "SvgPathElement", "SvgsvgElement", "SvgPoint", "SvgMatrix",
+  "HtmlDetailsElement", "HtmlDivElement", "AudioContext", "OscillatorNode", "GainNode", "AudioParam", "AudioDestinationNode", "AudioNode", "BaseAudioContext", "OscillatorType", "FileList", "File", "Blob", "HtmlCollection", "NodeList", "Node",
 ] }
