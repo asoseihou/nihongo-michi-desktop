@@ -4,7 +4,7 @@
 use crate::db::{self, R};
 use michi_core::agenda::{routine_event, trip_events, Event};
 use michi_core::routine::routine_of;
-use michi_core::time::today_key;
+use michi_core::time::{key_of, local, today_key};
 use rusqlite::Connection;
 use std::collections::HashSet;
 
@@ -14,6 +14,10 @@ pub fn sync_events(c: &Connection) -> R<bool> {
     let existing = db::events_all(c)?;
     let mut changed = false;
     let today = today_key();
+    // Series start when the learner started (so past days show their history),
+    // never later than today; an existing anchor only moves earlier.
+    let created = if p.created > 0.0 { key_of(local(p.created).date()) } else { today.clone() };
+    let first = created.min(today.clone());
 
     // Routine blocks → recurring events. Skips and moves survive edits.
     let mut keep: HashSet<String> = HashSet::new();
@@ -24,7 +28,7 @@ pub fn sync_events(c: &Connection) -> R<bool> {
         let id = format!("rotina-{}", b.id);
         keep.insert(id.clone());
         let old = existing.iter().find(|e| e.id == id);
-        let anchor = old.map(|e| e.date.clone()).unwrap_or_else(|| today.clone());
+        let anchor = old.map(|e| e.date.clone()).unwrap_or_else(|| first.clone()).min(first.clone());
         let mut ev = routine_event(&b, &anchor, p.remind_before());
         if let Some(o) = old {
             ev.exdates = o.exdates.clone();

@@ -113,12 +113,13 @@ pub fn refresh(app: &AppHandle) {
         };
         (text, desk.pause_until > now)
     };
-    if let Ok(g) = state.0.lock() {
-        if let Some(items) = g.as_ref() {
-            let _ = items.next.set_text(truncate(&next, 70));
-            let _ = items.pause.set_text(if paused { "Retomar avisos" } else { "Pausar avisos por 1 h" });
-        }
-    };
+    // Clone the handles and release the lock first: set_text from another
+    // thread waits for the main thread, which may be waiting for this lock.
+    let items = state.0.lock().ok().and_then(|g| g.as_ref().map(|i| (i.next.clone(), i.pause.clone())));
+    if let Some((next_item, pause_item)) = items {
+        let _ = next_item.set_text(truncate(&next, 70));
+        let _ = pause_item.set_text(if paused { "Retomar avisos" } else { "Pausar avisos por 1 h" });
+    }
 }
 
 fn truncate(s: &str, n: usize) -> String {
