@@ -3,6 +3,7 @@
 //! the reminder popup.
 
 mod agenda;
+mod agenda_cmd;
 mod aviso;
 mod backup;
 mod commands;
@@ -57,6 +58,12 @@ pub fn run() {
             commands::reset_progress,
             commands::agenda_range,
             commands::occ_mark,
+            agenda_cmd::event_get,
+            agenda_cmd::event_save,
+            agenda_cmd::event_delete,
+            agenda_cmd::occ_skip,
+            agenda_cmd::occ_move,
+            agenda_cmd::agenda_export_ics,
             commands::aviso_state,
             commands::aviso_fit,
             commands::aviso_action,
