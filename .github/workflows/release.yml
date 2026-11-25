@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Trunk e tauri-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk,tauri-cli@2
+
+      - name: Instalador e release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: cargo tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: Nihongo Michi ${{ github.ref_name }}
+          releaseBody: |
+            Instalador para Windows 10/11 (64 bits). Baixe o arquivo `…_x64-setup.exe` abaixo e abra.
+
+            - Instala só para o seu usuário, sem pedir administrador.
+            - O instalador não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
+            - Seus dados ficam no PC (SQLite). Para trazer o progresso da versão web: Ajustes → 📂 Restaurar backup.
+            - O modelo de voz do 🎤 Falar (~190 MB) é baixado pelo próprio app quando você pedir.
+
+            Dados de ensino: KANJIDIC2 (© EDRDG, CC BY-SA 4.0) e KanjiVG (© Ulrich Apel, CC BY-SA 3.0); ver DATA-LICENSES.md.
+          releaseDraft: false
+          prerelease: false

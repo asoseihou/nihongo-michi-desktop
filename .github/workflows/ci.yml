@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    env:
+      # whisper.cpp (whisper-rs) needs CMake and libclang; both come with the runner.
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatação
+        run: cargo fmt --all -- --check
+
+      - name: Testes (núcleo e backend)
+        run: cargo test
+
+      - name: Testes da interface
+        run: cargo test -p michi-ui
+
+      - name: Interface em wasm32
+        run: cargo build -p michi-ui --target wasm32-unknown-unknown
