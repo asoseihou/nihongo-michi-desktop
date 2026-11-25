@@ -117,6 +117,27 @@ pub struct Modal {
     body: Rc<dyn Fn() -> AnyView>,
 }
 
+thread_local! {
+    /// Owners of recent modals. Dropping an owner disposes its signals, so
+    /// they are kept here; only the oldest ones (long closed) are released.
+    static DETACHED: RefCell<std::collections::VecDeque<Owner>> = RefCell::new(std::collections::VecDeque::new());
+}
+
+/// Runs `f` under a fresh root owner, so signals created for a modal or a
+/// game are not disposed when the screen behind it redraws.
+pub fn detached<R>(f: impl FnOnce() -> R) -> R {
+    let owner = Owner::new_root(None);
+    let r = owner.with(f);
+    DETACHED.with(|d| {
+        let mut d = d.borrow_mut();
+        d.push_back(owner);
+        while d.len() > 64 {
+            d.pop_front();
+        }
+    });
+    r
+}
+
 /// Opens a modal; `title` is HTML. Returns its id for `close_modal`.
 pub fn open_modal(title: &str, wide: bool, body: impl Fn() -> AnyView + 'static) -> u32 {
     let id = MODAL_ID.with(|c| {
@@ -294,6 +315,9 @@ fn route_view(r: &str) -> AnyView {
         "hoje" => view! { <views::hoje::Hoje/> }.into_any(),
         "agenda" => view! { <views::agenda::Agenda/> }.into_any(),
         "ajustes" => view! { <views::ajustes::Ajustes/> }.into_any(),
+        "jornada" => view! { <views::jornada::Jornada/> }.into_any(),
+        "revisar" => view! { <views::revisar::Revisar/> }.into_any(),
+        "jogos" => view! { <views::jogos::Jogos/> }.into_any(),
         "avisos" => view! { <views::avisos::Avisos/> }.into_any(),
         "mais" => view! { <views::mais::Mais/> }.into_any(),
         other => view! { <views::soon::Soon route=other.to_string()/> }.into_any(),

@@ -103,7 +103,7 @@ pub fn open_lesson(lid: &str) {
     let Some(l) = c.lesson(lid).or_else(|| c.readings.iter().find(|r| r.id == lid)) else { return };
     let title = format!("{} <span class=\"jp muted small\">{}</span>", esc(&l.title), esc(&l.title_jp));
     let lid = lid.to_string();
-    let rev = RwSignal::new(0u64);
+    let rev = crate::app::detached(|| RwSignal::new(0u64));
     open_modal(&title, true, move || {
         let lid = lid.clone();
         (move || {

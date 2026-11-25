@@ -247,7 +247,6 @@ pub fn trip_headline(cd: &Countdown) -> String {
     }
 }
 
-
 /* ---------------- SRS decks ---------------- */
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

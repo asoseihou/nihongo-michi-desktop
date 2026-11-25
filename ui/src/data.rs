@@ -115,11 +115,19 @@ pub struct Area {
 
 #[derive(Deserialize, Clone, Debug, Default)]
 #[serde(default)]
+pub struct Anywhere {
+    pub text: String,
+    /// (label, lesson id)
+    pub items: Vec<(String, String)>,
+}
+
+#[derive(Deserialize, Clone, Debug, Default)]
+#[serde(default)]
 pub struct Wagotabi {
-    pub note: Value,
-    pub sources: Value,
+    pub note: String,
+    pub sources: Vec<String>,
     pub areas: Vec<Area>,
-    pub anywhere: Value,
+    pub anywhere: Option<Anywhere>,
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -150,7 +158,8 @@ pub struct Content {
     pub stations: Vec<Station>,
     pub wagotabi: Wagotabi,
     pub resources: Resources,
-    pub verbs: Vec<Value>,
+    /// (kanji, reading, meaning, class u|ru|irr, JLPT)
+    pub verbs: Vec<(String, String, String, String, u8)>,
     /// lesson id → index in `lessons`
     #[serde(skip)]
     pub lesson_idx: HashMap<String, usize>,
