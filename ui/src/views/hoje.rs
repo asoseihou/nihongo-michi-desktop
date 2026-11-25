@@ -9,6 +9,7 @@ use crate::logic::{
 use crate::store::{self, sigs};
 use crate::util::{esc, ev_checked, ev_value, safe_url};
 use leptos::prelude::*;
+use michi_core::agenda::Occ;
 use michi_core::routine::active_blocks;
 use michi_core::time::{dow, hhmm, key_add, local, minutes_of, now_ms, parse_key, study_dow, today_key};
 use serde_json::json;
@@ -27,6 +28,31 @@ pub fn Hoje() -> impl IntoView {
             ready.set(true);
         });
     }
+    // Today's agenda items that are not routine blocks (own events, trip day).
+    let agenda = RwSignal::new(Vec::<Occ>::new());
+    let arev = RwSignal::new(0u64);
+    crate::tauri::listen::<serde_json::Value>("michi://agenda-changed", move |_| {
+        if arev.try_get_untracked().is_some() {
+            arev.update(|v| *v += 1);
+        }
+    });
+    Effect::new(move |_| {
+        s.view.get();
+        arev.get();
+        #[derive(serde::Serialize)]
+        struct R {
+            from: String,
+            to: String,
+        }
+        let k = today_key();
+        spawn_local(async move {
+            if let Ok(v) = crate::tauri::invoke::<Vec<Occ>, _>("agenda_range", &R { from: k.clone(), to: k }).await {
+                if agenda.try_get_untracked().is_some() {
+                    agenda.set(v.into_iter().filter(|o| o.source != "rotina").collect());
+                }
+            }
+        });
+    });
     let clock = RwSignal::new(hhmm(now_ms()));
     let h = set_interval_with_handle(move || clock.set(hhmm(now_ms())), std::time::Duration::from_secs(20)).ok();
     on_cleanup(move || {
@@ -39,11 +65,11 @@ pub fn Hoje() -> impl IntoView {
         if !ready.get() {
             return view! { <div class="loading"><div class="spin"></div>"Preparando o dia…"</div> }.into_any();
         }
-        page(clock)
+        page(clock, agenda.get())
     }
 }
 
-fn page(clock: RwSignal<String>) -> AnyView {
+fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
     let c = data::content().unwrap_or_default();
     let p = store::p();
     let d = store::today();
@@ -67,8 +93,8 @@ fn page(clock: RwSignal<String>) -> AnyView {
     let total_min: f64 = blocks.iter().map(|b| b.min).sum();
     let streak = store::streak();
 
-    /* ---- board rows ---- */
-    let rows = blocks
+    /* ---- board rows (routine blocks + own agenda events, by time) ---- */
+    let mut rows: Vec<(i64, AnyView)> = blocks
         .iter()
         .enumerate()
         .map(|(i, b)| {
@@ -89,7 +115,7 @@ fn page(clock: RwSignal<String>) -> AnyView {
             let (go_route, bid) = (b.go.clone(), b.id.clone());
             let bid2 = b.id.clone();
             let name = b.name.clone();
-            view! {
+            let row = view! {
                 <div class="dep" class:done=done class:now=is_now role="listitem"
                     on:click=move |_| go(&go_route, intent_for_block(Some(&bid)))>
                     <div class="t">{b.time.clone()}</div>
@@ -110,11 +136,61 @@ fn page(clock: RwSignal<String>) -> AnyView {
                     </div>
                 </div>
             }
+            .into_any();
+            (t0, row)
         })
-        .collect_view();
+        .collect();
+    for o in agenda.iter().filter(|o| !o.all_day) {
+        let t0 = minutes_of(&o.time);
+        let done = o.done;
+        let is_now = !done && now_m >= t0 && now_m <= t0 + o.dur + 30;
+        let label = if done {
+            "済 FEITO"
+        } else if is_now {
+            "発車 AGORA"
+        } else if now_m > t0 + o.dur {
+            "未 PENDENTE"
+        } else {
+            "—"
+        };
+        let (o2, o3) = (o.clone(), o.clone());
+        let row = view! {
+            <div class="dep" class:done=done class:now=is_now role="listitem" on:click=move |_| crate::views::agenda::open_details(o2.clone())>
+                <div class="t">{o.time.clone()}</div>
+                <div style="min-width:0">
+                    <div class="n"><span class="kd" style=format!("--kc:{}", o.color)></span>{o.title.clone()}<span class="w">{format!(" · {} min · {}", o.dur, o.kind.label())}</span></div>
+                    <div class="w">{o.notes.clone()}</div>
+                </div>
+                <div class="row" style="gap:8px">
+                    <span class="st">{label}</span>
+                    <input type="checkbox" class="chk" prop:checked=done aria-label=format!("Marcar {} como feito", o.title)
+                        on:click=move |ev: web_sys::MouseEvent| {
+                            ev.stop_propagation();
+                            let checked = ev.target().and_then(|t| wasm_bindgen::JsCast::dyn_into::<web_sys::HtmlInputElement>(t).ok()).map(|i| i.checked()).unwrap_or(false);
+                            if checked { crate::util::xp_float(10.0, Some(&ev)); }
+                            crate::views::agenda::mark(&o3, checked);
+                        }/>
+                </div>
+            </div>
+        }
+        .into_any();
+        rows.push((t0, row));
+    }
+    rows.sort_by_key(|r| r.0);
+    let n_rows = rows.len();
+    let rows = rows.into_iter().map(|r| r.1).collect_view();
 
     /* ---- banners ---- */
     let mut banners: Vec<AnyView> = Vec::new();
+    if let Some(t) = agenda.iter().find(|o| o.all_day && o.source == "viagem") {
+        let t2 = t.clone();
+        banners.push(view! {
+            <div class="banner" style=format!("border-left:6px solid {}", t.color)><span class="bico">"✈️"</span>
+                <div class="grow"><b>{t.jp.clone()}" "</b>{t.title.clone()}</div>
+                <button class="btn sm" on:click=move |_| crate::views::agenda::open_details(t2.clone())>"Detalhes"</button>
+            </div>
+        }.into_any());
+    }
     if !p.onboarded {
         banners.push(onboarding(&c));
     }
@@ -281,7 +357,7 @@ fn page(clock: RwSignal<String>) -> AnyView {
         }))
         .collect_view();
 
-    let has_rows = !blocks.is_empty();
+    let has_rows = n_rows > 0;
     view! {
         <div class="row-between">
             <h1>"Hoje"</h1>
