@@ -54,8 +54,11 @@ impl Journey {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KanaDoc {
-    /// kana → [attempts, correct, …]
+    /// kana → [attempts, correct, average ms]
     pub s: BTreeMap<String, Vec<f64>>,
+    /// game → best score
+    #[serde(deserialize_with = "de::f64_map", skip_serializing_if = "BTreeMap::is_empty")]
+    pub best: BTreeMap<String, f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub u: Option<f64>,
     #[serde(flatten)]

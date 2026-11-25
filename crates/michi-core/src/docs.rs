@@ -60,6 +60,9 @@ pub struct Profile {
     /// Minutes before a routine block to remind (was the Google Calendar alarm).
     #[serde(deserialize_with = "de::f64_any")]
     pub cal_remind: f64,
+    /// Last kana set picked in the games ("h:basic,daku").
+    #[serde(deserialize_with = "de::string_any", skip_serializing_if = "String::is_empty")]
+    pub last_kana: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub u: Option<f64>,
     #[serde(flatten)]
@@ -92,6 +95,7 @@ impl Default for Profile {
             trip_start: String::new(),
             trip_end: String::new(),
             cal_remind: 0.0,
+            last_kana: String::new(),
             u: None,
             extra: Map::new(),
         }
