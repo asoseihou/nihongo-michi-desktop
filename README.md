@@ -47,7 +47,7 @@ python -m pip install --user cmake libclang
 ```
 
 ```powershell
-. .	ools\dev-env.ps1
+. .\tools\dev-env.ps1
 ```
 
 O modelo de voz (~190 MB) é baixado pelo próprio app, quando você pede, e fica na pasta de dados.
