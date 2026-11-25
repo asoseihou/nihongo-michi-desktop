@@ -1,5 +1,7 @@
 # Nihongo Michi — desktop (Rust)
 
+[![CI](https://github.com/asoseihou/nihongo-michi-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/asoseihou/nihongo-michi-desktop/actions/workflows/ci.yml)
+
 Versão desktop do **Nihongo Michi** (日本語の道), o app de estudo de japonês que nasceu
 como app web (o "artefato"). Feita em **Rust**, com **Tauri 2** (janela nativa com
 WebView2, sem Electron) e interface em **Leptos** compilada para WebAssembly pelo **Trunk**.
@@ -17,14 +19,26 @@ WebView2, sem Electron) e interface em **Leptos** compilada para WebAssembly pel
 
 Interface em português; o conteúdo de ensino segue em inglês + japonês.
 
+## Instalar
+
+Baixe o `Nihongo Michi_<versão>_x64-setup.exe` em
+[Releases](https://github.com/asoseihou/nihongo-michi-desktop/releases) e abra. Ele instala só
+para o seu usuário (sem administrador) e funciona no Windows 10/11 de 64 bits.
+
+- O instalador não é assinado. Se aparecer "O Windows protegeu o computador", clique em
+  **Mais informações → Executar assim mesmo**.
+- Para trazer o progresso da versão web: Ajustes → 📂 Restaurar backup.
+- Para os avisos chegarem sem abrir o app, ligue **Abrir com o Windows** em Ajustes → Lembretes.
+  Fechar a janela deixa o app na bandeja; para sair, use **Sair** no ícone 道.
+
 ## Andamento
 
 | Fase | O que entra | Estado |
 |---|---|---|
 | 1 | Workspace Tauri 2 + Leptos, SQLite com migrações, dados embutidos, importação do backup, navegação, tela **Hoje** com a rotina, bandeja + agendador + janela de aviso | ✅ |
 | 2 | Demais telas: Jornada (estações, chefão, selos, Linha Viagem 2028), Revisar (SRS + ordem dos traços), 10 minigames, Frases (montar, partículas, raio-X, ditado, leituras, 🎤 Falar com Whisper local), Imersão, Anki | ✅ |
-| 3 | Agenda completa: mês, semana, dia e lista; repetição; vários lembretes; arrastar e redimensionar | — |
-| 4 | Instalador e releases no GitHub Actions | — |
+| 3 | Agenda completa: mês, semana, dia e lista; repetição; vários lembretes; arrastar e redimensionar; exportar .ics | ✅ |
+| 4 | Instalador NSIS e releases no GitHub Actions | ✅ |
 
 O **Sensei** (IA) fica fora da primeira versão.
 
@@ -60,6 +74,25 @@ Testes da lógica compartilhada e do backend (SRS, RRULE, rotina, agendador, bac
 
 ```powershell
 cargo test
+```
+
+Instalador (gera `target\release\bundle\nsis\*-setup.exe`):
+
+```powershell
+cargo tauri build
+```
+
+## Releases
+
+Cada tag `v*` enviada ao GitHub dispara o workflow **Release**, que compila no Windows e
+publica o instalador na página de Releases. O workflow **CI** roda os testes a cada push.
+
+```powershell
+git tag v0.1.0
+```
+
+```powershell
+git push origin v0.1.0
 ```
 
 ## Estrutura
