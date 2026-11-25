@@ -3,9 +3,11 @@
 
 pub mod agenda;
 pub mod ajustes;
+pub mod anki;
 pub mod avisos;
 pub mod frases;
 pub mod hoje;
+pub mod imersao;
 pub mod jogos;
 pub mod jornada;
 pub mod kanji;

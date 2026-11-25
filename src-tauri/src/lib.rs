@@ -8,6 +8,7 @@ mod backup;
 mod commands;
 mod db;
 mod events;
+mod files;
 mod scheduler;
 mod sound;
 mod stt;
@@ -71,6 +72,9 @@ pub fn run() {
             commands::app_info,
             commands::reveal_data_dir,
             commands::quit_app,
+            files::save_text,
+            files::open_text,
+            files::anki_connect,
             stt::stt_status,
             stt::stt_start,
             stt::stt_stop,

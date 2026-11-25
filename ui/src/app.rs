@@ -319,6 +319,8 @@ fn route_view(r: &str) -> AnyView {
         "revisar" => view! { <views::revisar::Revisar/> }.into_any(),
         "jogos" => view! { <views::jogos::Jogos/> }.into_any(),
         "frases" => view! { <views::frases::Frases/> }.into_any(),
+        "imersao" => view! { <views::imersao::Imersao/> }.into_any(),
+        "anki" => view! { <views::anki::Anki/> }.into_any(),
         "avisos" => view! { <views::avisos::Avisos/> }.into_any(),
         "mais" => view! { <views::mais::Mais/> }.into_any(),
         other => view! { <views::soon::Soon route=other.to_string()/> }.into_any(),
