@@ -30,6 +30,7 @@ pub fn run() {
             let db = db::Db::open(&dir.join("michi.db")).map_err(std::io::Error::other)?;
             sync::sync_events(&db.lock()).map_err(std::io::Error::other)?;
             app.manage(db);
+            app.manage(stt::Stt::default());
             tray::build(app.handle())?;
             // Started with Windows (`--hidden`): stay in the tray.
             if !std::env::args().any(|a| a == "--hidden") {
@@ -79,6 +80,7 @@ pub fn run() {
             stt::stt_start,
             stt::stt_stop,
             stt::stt_cancel,
+            stt::stt_download,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o Nihongo Michi");

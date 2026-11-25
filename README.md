@@ -22,7 +22,7 @@ Interface em português; o conteúdo de ensino segue em inglês + japonês.
 | Fase | O que entra | Estado |
 |---|---|---|
 | 1 | Workspace Tauri 2 + Leptos, SQLite com migrações, dados embutidos, importação do backup, navegação, tela **Hoje** com a rotina, bandeja + agendador + janela de aviso | ✅ |
-| 2 | Demais telas: Jornada (estações, chefão, selos, Linha Viagem 2028), Revisar (SRS + ordem dos traços), 10 minigames, Frases (montar, partículas, raio-X, ditado, leituras, 🎤 Falar), Imersão, Anki | em andamento |
+| 2 | Demais telas: Jornada (estações, chefão, selos, Linha Viagem 2028), Revisar (SRS + ordem dos traços), 10 minigames, Frases (montar, partículas, raio-X, ditado, leituras, 🎤 Falar com Whisper local), Imersão, Anki | ✅ |
 | 3 | Agenda completa: mês, semana, dia e lista; repetição; vários lembretes; arrastar e redimensionar | — |
 | 4 | Instalador e releases no GitHub Actions | — |
 
@@ -39,6 +39,19 @@ cargo install --locked trunk
 cargo install --locked tauri-cli --version "^2"
 ```
 
+O reconhecimento de voz do 🎤 Falar usa o Whisper (whisper.cpp via `whisper-rs`), que
+precisa do CMake e do libclang para compilar. Sem administrador:
+
+```powershell
+python -m pip install --user cmake libclang
+```
+
+```powershell
+. .	ools\dev-env.ps1
+```
+
+O modelo de voz (~190 MB) é baixado pelo próprio app, quando você pede, e fica na pasta de dados.
+
 ```powershell
 cargo tauri dev
 ```
@@ -54,7 +67,8 @@ cargo test
 ```
 crates/michi-core   lógica compartilhada (nativo + wasm): dia de estudo às 04:00, SRS (SM-2),
                     rotina, RRULE, documentos do backup, agenda, itinerário da viagem
-src-tauri           backend: SQLite + migrações, comandos, agendador, bandeja, janela de aviso, som
+src-tauri           backend: SQLite + migrações, comandos, agendador, bandeja, janela de aviso, som,
+                    voz (cpal + Whisper), arquivos e AnkiConnect
 ui                  interface Leptos (Trunk): shell, telas, janela de aviso; ui/data = dados embutidos
 tools               scripts auxiliares (ícones)
 ```

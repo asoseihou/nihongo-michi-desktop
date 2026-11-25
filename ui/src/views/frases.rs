@@ -894,7 +894,73 @@ fn spk_score(s: &Sentence, heard: &str) -> SpkScore {
 struct SttStatus {
     available: bool,
     #[serde(default)]
+    model: bool,
+    #[serde(default)]
+    downloading: bool,
+    #[serde(default)]
+    size_mb: u64,
+    #[serde(default)]
     message: String,
+}
+
+#[derive(Deserialize, Clone, Debug, Default)]
+struct DlProgress {
+    done: u64,
+    total: u64,
+    finished: bool,
+    error: Option<String>,
+}
+
+/// Download button + progress for the Whisper model.
+fn model_download(stt: RwSignal<SttStatus>) -> AnyView {
+    let progress = RwSignal::new(None::<f64>);
+    let refresh = move || {
+        spawn_local(async move {
+            if let Ok(s) = tauri::invoke::<SttStatus, _>("stt_status", &NoArgs {}).await {
+                stt.set(s);
+            }
+        })
+    };
+    tauri::listen::<DlProgress>("michi://stt-progress", move |p| {
+        if progress.try_get_untracked().is_none() {
+            return;
+        }
+        if p.finished || p.error.is_some() {
+            progress.set(None);
+            if let Some(e) = p.error {
+                toast(&format!("Não consegui baixar: {e}"), "bad");
+            } else {
+                toast("Modelo de voz pronto! Agora o Falar ouve você.", "ok");
+            }
+            refresh();
+        } else if p.total > 0 {
+            progress.set(Some(p.done as f64 / p.total as f64));
+        }
+    });
+    (move || {
+        let s = stt.get();
+        if s.available {
+            return view! { <span></span> }.into_any();
+        }
+        let busy = s.downloading || progress.get().is_some();
+        view! {
+            <div class="card tint stack">
+                <div class="small">{s.message.clone()}</div>
+                {if busy {
+                    let f = progress.get().unwrap_or(0.0);
+                    view! { <div class="small muted">{format!("Baixando… {}%", (f * 100.0).round())}</div><div inner_html=crate::app::bar(f, "")></div> }.into_any()
+                } else {
+                    view! { <button class="btn sm primary" style="align-self:flex-start" on:click=move |_| {
+                        progress.set(Some(0.0));
+                        tauri::call("stt_download", NoArgs {});
+                    }>{format!("⬇️ Baixar o modelo de voz (~{} MB)", if s.size_mb > 0 { s.size_mb } else { 190 })}</button> }.into_any()
+                }}
+                <div class="tiny faint">"O reconhecimento roda no seu PC (Whisper); o áudio não sai do computador."</div>
+            </div>
+        }
+        .into_any()
+    })
+    .into_any()
 }
 
 fn chunks_html(s: &Sentence, sc: Option<&SpkScore>) -> String {
@@ -1182,10 +1248,7 @@ fn Speak(pids: Vec<String>, page: RwSignal<Page>, gen: RwSignal<u32>) -> impl In
                         </div>
                     })}
                 </div>
-                {(!available).then(|| {
-                    let m = stt.get().message;
-                    view! { <div class="small muted">{if m.is_empty() { "O reconhecimento de voz local ainda não está pronto, então o treino fica no modo sombra.".to_string() } else { m }}</div> }
-                })}
+                {(!available).then(|| model_download(stt))}
             }
             .into_any()
         }}
