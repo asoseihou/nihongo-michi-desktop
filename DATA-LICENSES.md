@@ -1,5 +1,8 @@
 # Licenças dos dados embutidos (`ui/data/`)
 
+O código do app está sob a licença MIT ([LICENSE](LICENSE)). Os dados abaixo não: cada
+arquivo segue a licença da sua origem.
+
 | Arquivo | Origem | Licença |
 |---|---|---|
 | `kanji.json` | **KANJIDIC2** — © Electronic Dictionary Research and Development Group (EDRDG). Níveis JLPT: kanji-data (David Gouveia, MIT). | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — ver <https://www.edrdg.org/edrdg/licence.html> |

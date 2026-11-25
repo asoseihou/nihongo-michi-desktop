@@ -108,6 +108,6 @@ tools               scripts auxiliares (ícones)
 
 ## Dados e licenças
 
-O código é do autor. Os dados de ensino têm licenças próprias — ver
+O código está sob a licença [MIT](LICENSE). Os dados de ensino têm licenças próprias — ver
 [DATA-LICENSES.md](DATA-LICENSES.md). Em resumo: KANJIDIC2 (© EDRDG, CC BY-SA 4.0) e
 KanjiVG (© Ulrich Apel, CC BY-SA 3.0) continuam sob CC BY-SA, com crédito na tela de Ajustes.

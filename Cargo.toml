@@ -9,6 +9,8 @@ default-members = ["crates/michi-core", "src-tauri"]
 version = "0.1.0"
 edition = "2021"
 authors = ["asoseihou"]
+license = "MIT"
+repository = "https://github.com/asoseihou/nihongo-michi-desktop"
 rust-version = "1.85"
 
 [workspace.dependencies]
