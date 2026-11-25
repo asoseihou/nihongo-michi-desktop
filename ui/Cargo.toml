@@ -1,0 +1,26 @@
+[package]
+name = "michi-ui"
+description = "Nihongo Michi UI (Leptos, compiled to wasm32 by Trunk)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+michi-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+leptos = { version = "0.8", features = ["csr"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+web-sys = { version = "0.3", features = [
+  "Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlSelectElement",
+  "HtmlTextAreaElement", "Location", "History", "Event", "EventTarget", "KeyboardEvent", "MouseEvent",
+  "PointerEvent", "DomRect", "Storage", "Response", "RequestInit", "Request", "Headers",
+  "SpeechSynthesis", "SpeechSynthesisUtterance", "SpeechSynthesisVoice", "SpeechSynthesisEvent",
+  "ScrollIntoViewOptions", "ScrollLogicalPosition", "ScrollToOptions", "CssStyleDeclaration",
+  "DomTokenList", "Performance", "VisibilityState", "FileList", "File", "Blob", "HtmlCollection", "NodeList", "Node",
+] }

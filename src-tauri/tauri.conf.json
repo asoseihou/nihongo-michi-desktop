@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nihongo Michi",
+  "version": "0.1.0",
+  "identifier": "io.github.asoseihou.nihongomichi",
+  "build": {
+    "beforeDevCommand": "trunk serve",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "trunk build --release",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nihongo Michi",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 380,
+        "minHeight": 560,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "category": "Education",
+    "shortDescription": "Estudo de japonês com rotina, agenda e lembretes próprios",
+    "longDescription": "Nihongo Michi: jornada por estações, SRS estilo Anki, ordem dos traços, minigames, frases em pedaços, imersão e uma agenda com lembretes próprios.",
+    "copyright": "Código © asoseihou. Dados: KANJIDIC2 (EDRDG, CC BY-SA 4.0), KanjiVG (Ulrich Apel, CC BY-SA 3.0).",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
