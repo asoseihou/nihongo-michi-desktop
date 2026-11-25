@@ -6,7 +6,7 @@ use leptos::prelude::*;
 pub fn Mais() -> impl IntoView {
     let cards = [
         ("imersao", "浸", "Imersão", "Vlogs, podcasts, Wagotabi e o seu registro."),
-        ("sensei", "先生", "Sensei IA", "Tire dúvidas, corrija frases e gere exercícios novos."),
+        ("sensei", "先生", "Sensei IA", if crate::app::SENSEI_ON { "Tire dúvidas, corrija frases e gere exercícios novos." } else { "Em breve." }),
         ("anki", "暗記", "Anki", "Exporte baralhos, importe seu progresso, sincronize."),
         ("avisos", "🔔", "Central de avisos", "Histórico dos lembretes, perdidos e silenciados."),
         ("ajustes", "設定", "Ajustes", "Rotina, lembretes, metas, voz, backup."),

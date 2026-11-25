@@ -13,7 +13,7 @@ pub fn Soon(route: String) -> impl IntoView {
         "jogos" => "Os 10 minigames (chuva de kana, memória, partículas…).",
         "frases" => "Montar, partículas, raio-X, ditado, leituras e o modo 🎤 Falar.",
         "imersao" => "Vlogs e podcasts do dia, registro de imersão e a linha Wagotabi.",
-        "sensei" => "O Sensei fica para depois: a primeira versão sai sem ele.",
+        "sensei" => "O Sensei fica para uma próxima versão. Até lá, o resto do app funciona normalmente.",
         "anki" => "Exportar .txt com GUID, importar e AnkiConnect.",
         _ => "",
     };
@@ -21,9 +21,11 @@ pub fn Soon(route: String) -> impl IntoView {
         <h1>{label}" "<span class="jp muted small">{jp}</span></h1>
         <div class="empty stack" style="align-items:center">
             <div class="bigq" style="font-size:56px">{jp}</div>
-            <b>"Esta tela chega na fase 2 do porte."</b>
+            <b>{if route == "sensei" { "Em breve." } else { "Esta tela chega na fase 2 do porte." }}</b>
             <div class="small">{what}</div>
-            <div class="tiny faint">"Seu progresso desta área já está salvo: veio no backup e aparece aqui quando a tela for portada."</div>
+            {(route != "sensei").then(|| view! {
+                <div class="tiny faint">"Seu progresso desta área já está salvo: veio no backup e aparece aqui quando a tela for portada."</div>
+            })}
         </div>
     }
 }

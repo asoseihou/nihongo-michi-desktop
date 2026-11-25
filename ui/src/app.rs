@@ -30,6 +30,10 @@ pub const ROUTES: [(&str, &str, &str); 10] = [
     ("anki", "Anki", "暗記"),
     ("ajustes", "Ajustes", "設定"),
 ];
+/// The Sensei (AI) is off in the first version: the tab stays, marked "em breve",
+/// and every button that would open it is hidden.
+pub const SENSEI_ON: bool = false;
+
 const MOBILE: [&str; 7] = ["hoje", "agenda", "jornada", "revisar", "jogos", "frases", "mais"];
 const EXTRA: [&str; 2] = ["avisos", "mais"];
 

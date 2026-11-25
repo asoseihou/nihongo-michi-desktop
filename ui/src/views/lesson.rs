@@ -76,14 +76,16 @@ pub fn point_card(p: &Point, open: bool, on_change: impl Fn() + Clone + 'static)
                     <button class="btn sm" on:click=practice("particles", pid_p)>"を Partículas"</button>
                     <button class="btn sm" on:click=practice("xray", pid_x)>"🔬 Raio-X"</button>
                     {yt.map(|u| view! { <a class="btn sm" href=u target="_blank" rel="noopener">"▶ Vídeo"</a> })}
-                    <button class="btn sm" on:click=move |_| {
-                        close_all_modals();
-                        if let Some(c) = data::content() {
-                            if let Some(p) = c.point(&pid_a) {
-                                go("sensei", Some(json!({"ask": format!("Explain the grammar point \"{}\" ({}) again with a different angle and 3 new example sentences.", p.title, p.pattern)})));
+                    {crate::app::SENSEI_ON.then(|| view! {
+                        <button class="btn sm" on:click=move |_| {
+                            close_all_modals();
+                            if let Some(c) = data::content() {
+                                if let Some(p) = c.point(&pid_a) {
+                                    go("sensei", Some(json!({"ask": format!("Explain the grammar point \"{}\" ({}) again with a different angle and 3 new example sentences.", p.title, p.pattern)})));
+                                }
                             }
-                        }
-                    }>"先生 Perguntar"</button>
+                        }>"先生 Perguntar"</button>
+                    })}
                     {(!studied).then(|| {
                         let on_change = on_change.clone();
                         view! { <button class="btn sm primary" on:click=move |ev| { mark_studied(&pid_s, Some(&ev)); on_change(); }>"✓ Estudei"</button> }
