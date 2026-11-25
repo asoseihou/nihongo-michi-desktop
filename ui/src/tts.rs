@@ -85,3 +85,24 @@ pub fn say(text: &str, rate: Option<f64>) {
         s.speak(&u);
     }
 }
+
+/// `await say(text)`: resolves when the utterance ends (or after 15 s).
+pub async fn say_wait(text: &str, rate: Option<f64>) {
+    let text = plain_j(text);
+    let (Some(s), Some(v)) = (synth(), PICKED.with(|p| p.borrow().clone())) else { return };
+    if text.is_empty() {
+        return;
+    }
+    s.cancel();
+    let Ok(u) = SpeechSynthesisUtterance::new_with_text(&text) else { return };
+    u.set_voice(Some(&v));
+    u.set_lang(&v.lang());
+    u.set_rate(rate.unwrap_or_else(|| store::read(|s| s.p.tts_rate)).clamp(0.5, 1.5) as f32);
+    let p = js_sys::Promise::new(&mut |res, _| {
+        u.set_onend(Some(&res));
+        u.set_onerror(Some(&res));
+        let _ = crate::util::window().set_timeout_with_callback_and_timeout_and_arguments_0(&res, 15_000);
+    });
+    s.speak(&u);
+    let _ = wasm_bindgen_futures::JsFuture::from(p).await;
+}

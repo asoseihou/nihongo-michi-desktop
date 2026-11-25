@@ -4,6 +4,7 @@
 pub mod agenda;
 pub mod ajustes;
 pub mod avisos;
+pub mod frases;
 pub mod hoje;
 pub mod jogos;
 pub mod jornada;

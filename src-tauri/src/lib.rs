@@ -10,6 +10,7 @@ mod db;
 mod events;
 mod scheduler;
 mod sound;
+mod stt;
 mod sync;
 mod tray;
 
@@ -70,6 +71,10 @@ pub fn run() {
             commands::app_info,
             commands::reveal_data_dir,
             commands::quit_app,
+            stt::stt_status,
+            stt::stt_start,
+            stt::stt_stop,
+            stt::stt_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o Nihongo Michi");

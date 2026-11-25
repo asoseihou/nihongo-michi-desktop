@@ -37,6 +37,14 @@ pub struct Sentence {
 
 #[derive(Deserialize, Clone, Debug, Default)]
 #[serde(default)]
+pub struct Question {
+    pub q: String,
+    pub opts: Vec<String>,
+    pub a: usize,
+}
+
+#[derive(Deserialize, Clone, Debug, Default)]
+#[serde(default)]
 pub struct Point {
     pub id: String,
     pub title: String,
@@ -46,6 +54,9 @@ pub struct Point {
     pub tip: String,
     pub yt: String,
     pub s: Vec<Sentence>,
+    /// Comprehension questions (graded readings).
+    #[serde(deserialize_with = "null_vec")]
+    pub q: Vec<Question>,
     #[serde(skip)]
     pub lesson: String,
 }

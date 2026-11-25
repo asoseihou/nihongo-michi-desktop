@@ -12,6 +12,14 @@ pub struct PointState {
     /// When it was marked as studied (ms), 0 = not studied.
     #[serde(deserialize_with = "de::f64_any", skip_serializing_if = "is_zero")]
     pub studied: f64,
+    /// Practice attempts / correct ones (Frases).
+    #[serde(deserialize_with = "de::f64_any", skip_serializing_if = "is_zero")]
+    pub tries: f64,
+    #[serde(deserialize_with = "de::f64_any", skip_serializing_if = "is_zero")]
+    pub ok: f64,
+    /// When a graded reading was completed.
+    #[serde(deserialize_with = "de::f64_any", skip_serializing_if = "is_zero")]
+    pub read: f64,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
