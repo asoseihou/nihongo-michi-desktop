@@ -22,6 +22,10 @@ pub struct Local {
     pub backup_keep: u32,
     /// Shared folder for the sync between PCs. Empty = sync off.
     pub sync_dir: String,
+    /// Do not look for new versions by itself.
+    pub update_check_off: bool,
+    /// Ask before installing (never install by itself when the window closes).
+    pub update_install_ask: bool,
 }
 
 pub const DEFAULT_KEEP: u32 = 30;

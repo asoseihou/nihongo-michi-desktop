@@ -20,6 +20,7 @@ mod sound;
 mod stt;
 mod sync;
 mod tray;
+mod updater;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
@@ -30,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -38,9 +40,14 @@ pub fn run() {
             app.manage(db);
             app.manage(stt::Stt::default());
             app.manage(pcsync::SyncState::default());
+            // Right after an update, the new version says what changed; one
+            // installed while the window was closed starts in the tray.
+            let just = updater::take_marker(app.handle());
+            let hidden = just.as_ref().map(|j| j.hidden).unwrap_or(false);
+            updater::init(app.handle(), just);
             tray::build(app.handle())?;
             // Started with Windows (`--hidden`): stay in the tray.
-            if !std::env::args().any(|a| a == "--hidden") {
+            if !hidden && !std::env::args().any(|a| a == "--hidden") {
                 events::show_main(app.handle());
             }
             // First sync, then the reminder scheduler, then backups and sync
@@ -88,6 +95,11 @@ pub fn run() {
             datacmd::sync_join,
             datacmd::sync_now,
             datacmd::sync_off,
+            datacmd::update_status,
+            datacmd::update_check,
+            datacmd::update_install,
+            datacmd::update_set,
+            datacmd::update_seen,
             commands::aviso_state,
             commands::aviso_fit,
             commands::aviso_action,

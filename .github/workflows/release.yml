@@ -27,22 +27,37 @@ jobs:
         with:
           tool: trunk,tauri-cli@2
 
+      # The release text: this version's section of NOVIDADES.md, then how to
+      # install. The app shows the first part after updating itself.
+      - name: Notas da versão
+        id: notes
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          awk -v t="## ${tag}" '$0==t{f=1;next} /^## /{if(f)exit} f' NOVIDADES.md > notes.md
+          {
+            echo 'body<<NOTES_EOF'
+            cat notes.md
+            echo
+            echo '---'
+            echo
+            cat .github/release-install.md
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # The updater files (.sig and latest.json) are signed with the project's
+      # key, kept in the repository secrets; the app only installs what it signs.
       - name: Instalador e release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: cargo tauri
           tagName: ${{ github.ref_name }}
           releaseName: Nihongo Michi ${{ github.ref_name }}
-          releaseBody: |
-            Instalador para Windows 10/11 (64 bits). Baixe o arquivo `…_x64-setup.exe` abaixo e abra.
-
-            - Instala só para o seu usuário, sem pedir administrador.
-            - O instalador não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
-            - Seus dados ficam no PC (SQLite). Para trazer o progresso da versão web: Ajustes → 📂 Restaurar backup.
-            - O modelo de voz do 🎤 Falar (~190 MB) é baixado pelo próprio app quando você pedir.
-
-            Dados de ensino: KANJIDIC2 (© EDRDG, CC BY-SA 4.0) e KanjiVG (© Ulrich Apel, CC BY-SA 3.0); ver DATA-LICENSES.md.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true

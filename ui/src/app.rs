@@ -375,6 +375,7 @@ pub fn App() -> impl IntoView {
 
     let sync = RwSignal::new(SyncLook::default());
     let syncing = RwSignal::new(false);
+    let upd = RwSignal::new(crate::views::atualizar::UpdStatus::default());
     let _ = window_event_listener(leptos::ev::hashchange, move |_| route.set(hash_route()));
     install_global_handlers();
     crate::tts::init();
@@ -391,6 +392,7 @@ pub fn App() -> impl IntoView {
         tauri::listen::<Vec<String>>("michi://sync-pending", move |names| sync.update(|s| s.pending = names));
         tauri::listen::<SyncLook>("michi://sync-status", move |look| sync.set(look));
         load_sync_look(sync);
+        tauri::listen::<crate::views::atualizar::UpdStatus>("michi://update", move |s| upd.set(s));
     }
 
     spawn_local(async move {
@@ -401,6 +403,13 @@ pub fn App() -> impl IntoView {
         s.loaded.set(true);
         store::refresh();
         refresh_unread();
+        if let Ok(u) = tauri::invoke::<crate::views::atualizar::UpdStatus, _>("update_status", &tauri::NoArgs {}).await
+        {
+            if let Some(j) = &u.just_updated {
+                crate::views::atualizar::show_just_updated(j);
+            }
+            upd.set(u);
+        }
         let _ = crate::data::need_content().await;
         let _ = crate::data::need_kanji().await;
     });
@@ -464,6 +473,20 @@ pub fn App() -> impl IntoView {
             <main class="main" id="main" tabindex="-1">
                 <div class="wrap">
                     <Topbar/>
+                    {move || {
+                        let u = upd.get();
+                        (u.state == "ready").then(|| view! {
+                            <div class="banner ok sync-banner">
+                                <span class="bico">"🎁"</span>
+                                <div class="grow small">{if u.auto_install {
+                                    format!("A versão {} está pronta. Ela instala sozinha quando você fechar a janela, ou agora:", u.version)
+                                } else {
+                                    format!("A versão {} está pronta para instalar:", u.version)
+                                }}</div>
+                                <button class="btn sm primary" on:click=|_| crate::views::atualizar::install_now()>"Reiniciar e atualizar"</button>
+                            </div>
+                        })
+                    }}
                     {move || {
                         let names = sync.get().pending;
                         (!names.is_empty()).then(|| view! {

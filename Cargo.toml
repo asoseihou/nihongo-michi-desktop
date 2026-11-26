@@ -6,7 +6,7 @@ members = ["crates/michi-core", "src-tauri", "ui"]
 default-members = ["crates/michi-core", "src-tauri"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["asoseihou"]
 license = "MIT"

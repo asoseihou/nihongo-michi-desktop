@@ -158,6 +158,10 @@ pub fn start(app: &AppHandle) {
             if matches!(msg, Msg::Hidden) || sync_wanted(&app) {
                 run_sync(&app, !window_open(&app));
             }
+            if crate::updater::due(&app, started) {
+                let _ = tauri::async_runtime::block_on(crate::updater::check(&app, false));
+            }
+            crate::updater::maybe_install(&app, window_open(&app));
         }
     });
 }

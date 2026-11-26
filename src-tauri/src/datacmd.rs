@@ -138,3 +138,48 @@ pub fn sync_off(app: AppHandle) -> R<pcsync::Status> {
     poke(&app);
     Ok(pcsync::status(&app))
 }
+
+/* ---------------- updates ---------------- */
+
+#[tauri::command]
+pub fn update_status(app: AppHandle) -> crate::updater::Status {
+    crate::updater::status(&app)
+}
+
+#[tauri::command]
+pub async fn update_check(app: AppHandle) -> R<crate::updater::Status> {
+    crate::updater::check(&app, true).await
+}
+
+/// "Reiniciar e atualizar" (the UI saved everything first).
+#[tauri::command]
+pub fn update_install(app: AppHandle) -> R<()> {
+    crate::updater::install(&app, false)
+}
+
+#[tauri::command]
+pub fn update_set(
+    app: AppHandle,
+    db: State<'_, Db>,
+    auto_check: Option<bool>,
+    auto_install: Option<bool>,
+) -> R<crate::updater::Status> {
+    {
+        let c = db.lock();
+        local::update(&c, |l| {
+            if let Some(v) = auto_check {
+                l.update_check_off = !v;
+            }
+            if let Some(v) = auto_install {
+                l.update_install_ask = !v;
+            }
+        })?;
+    }
+    Ok(crate::updater::status(&app))
+}
+
+/// The "what's new" note after an update was shown.
+#[tauri::command]
+pub fn update_seen(app: AppHandle) {
+    crate::updater::seen(&app);
+}

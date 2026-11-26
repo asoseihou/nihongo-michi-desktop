@@ -36,6 +36,7 @@ pub fn Ajustes() -> impl IntoView {
         <Reminders/>
         <Data/>
         <div class="grid2"><crate::views::dados::AutoBackup/><crate::views::dados::PcSync/></div>
+        <crate::views::atualizar::Updates/>
         <Credits/>
     }
 }

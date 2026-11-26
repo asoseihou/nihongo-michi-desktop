@@ -4,6 +4,7 @@
 pub mod agenda;
 pub mod ajustes;
 pub mod anki;
+pub mod atualizar;
 pub mod avisos;
 pub mod dados;
 pub mod frases;
