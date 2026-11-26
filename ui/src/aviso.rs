@@ -140,6 +140,7 @@ fn body(s: AvisoState) -> AnyView {
             </div>
             <div class="av-btns">
                 <button class="av-b ok" on:click=move |_| act(id, "done", None)>"✓ Feito"</button>
+                <button class="av-b" title="Começar o modo foco com este bloco" on:click=move |_| act(id, "focus", None)>"▶ Foco"</button>
                 <button class="av-b" on:click=move |_| act(id, "snooze", Some(snooze))>{format!("⏰ Adiar {snooze} min")}</button>
                 <span class="av-chips" title="Adiar por outros minutos">{snooze_chips}</span>
                 <button class="av-b" on:click=move |_| act(id, "open", None)>"↗ Abrir"</button>

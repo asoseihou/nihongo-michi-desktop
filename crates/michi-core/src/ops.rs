@@ -14,12 +14,14 @@ pub enum Op {
     /// `day.ag[key] = min` (None zeroes it: a 0 survives the sync between
     /// PCs, where a missing key would bring the old credit back)
     Ag { day: String, key: String, min: Option<f64> },
+    /// `day.fo[key] += min` (a focus session ended)
+    Fo { day: String, key: String, min: f64 },
 }
 
 impl Op {
     pub fn day(&self) -> &str {
         match self {
-            Op::Done { day, .. } | Op::Xp { day, .. } | Op::Ag { day, .. } => day,
+            Op::Done { day, .. } | Op::Xp { day, .. } | Op::Ag { day, .. } | Op::Fo { day, .. } => day,
         }
     }
 
@@ -36,6 +38,9 @@ impl Op {
             Op::Ag { key, min, .. } => {
                 d.ag.insert(key.clone(), min.unwrap_or(0.0));
             }
+            Op::Fo { key, min, .. } => {
+                *d.fo.entry(key.clone()).or_insert(0.0) += min;
+            }
         }
     }
 
@@ -48,6 +53,15 @@ impl Op {
 
 /// XP for checking a block or an agenda item (same as the board's checkbox).
 pub const DONE_XP: f64 = 10.0;
+
+/// XP for a focus session: 1 per 3 minutes (so an hour alone keeps the streak).
+pub fn focus_xp(minutes: f64) -> f64 {
+    if minutes < 1.0 {
+        0.0
+    } else {
+        (minutes / 3.0).floor().max(1.0)
+    }
+}
 
 /// Operations for marking an agenda occurrence done / not done.
 /// `block_id` is set for routine events. XP is never taken back (the
@@ -85,5 +99,12 @@ mod tests {
         assert_eq!(d.study_minutes(), 0.0);
         let j = serde_json::to_string(&Op::Xp { day: "x".into(), n: 10.0 }).unwrap();
         assert_eq!(j, r#"{"t":"xp","day":"x","n":10.0}"#);
+        // Focus minutes add up per key and count in the day.
+        let fo = Op::Fo { day: "2026-11-25".into(), key: "rotina:vlog".into(), min: 20.0 };
+        fo.apply_day(&mut d);
+        fo.apply_day(&mut d);
+        assert_eq!(d.fo["rotina:vlog"], 40.0);
+        assert_eq!(d.study_minutes(), 40.0);
+        assert_eq!((focus_xp(0.4), focus_xp(2.0), focus_xp(25.0), focus_xp(60.0)), (0.0, 1.0, 8.0, 20.0));
     }
 }

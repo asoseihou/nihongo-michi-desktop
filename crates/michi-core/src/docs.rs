@@ -163,6 +163,10 @@ pub struct DayDoc {
     /// keyed by `eventId@YYYY-MM-DD` (or `rotina:<blockId>`).
     #[serde(deserialize_with = "de::f64_map", skip_serializing_if = "BTreeMap::is_empty")]
     pub ag: BTreeMap<String, f64>,
+    /// Desktop only: minutes of focus sessions, by the same keys as `ag`
+    /// (`livre:<id>` for free study), so a focused block is not counted twice.
+    #[serde(deserialize_with = "de::f64_map", skip_serializing_if = "BTreeMap::is_empty")]
+    pub fo: BTreeMap<String, f64>,
     /// Desktop only: the SRS queue was emptied today (after ≥10 reviews).
     #[serde(rename = "srsClear", deserialize_with = "de::bool_any", skip_serializing_if = "de::is_false")]
     pub srs_clear: bool,
@@ -182,12 +186,26 @@ impl DayDoc {
         self.sec.values().sum::<f64>() / 60.0 + self.imm.iter().map(|e| e.min).sum::<f64>()
     }
 
-    /// `studyMinutes(d)` plus the minutes credited from the agenda. Agenda
-    /// credit is a floor: it only adds what active time did not already count.
+    /// Minutes credited by the agenda and by focus sessions; per item, the
+    /// larger of the two (a block focused for 30 min and marked done counts 30).
+    pub fn credited_minutes(&self) -> f64 {
+        let mut total = 0.0;
+        for (k, v) in &self.ag {
+            total += v.max(self.fo.get(k).copied().unwrap_or(0.0));
+        }
+        for (k, v) in &self.fo {
+            if !self.ag.contains_key(k) {
+                total += v;
+            }
+        }
+        total
+    }
+
+    /// `studyMinutes(d)` plus the minutes credited from the agenda and focus.
+    /// Credit is a floor: it only adds what active time did not already count.
     pub fn study_minutes(&self) -> f64 {
         let tracked = self.tracked_minutes();
-        let credited: f64 = self.ag.values().sum();
-        tracked.max(credited).max(0.0).round()
+        tracked.max(self.credited_minutes()).max(0.0).round()
     }
 
     /// `BLOCK_AUTO`: blocks that complete themselves from what was done today.
@@ -263,6 +281,11 @@ mod tests {
         assert!(d.block_done("vlog") && d.block_done("jogo") && d.block_done("x") && !d.block_done("y"));
         d.ag.insert("e@2026-11-25".into(), 60.0);
         assert_eq!(d.study_minutes(), 60.0);
+        // Focus on the same item counts once (the larger); free focus adds.
+        d.fo.insert("e@2026-11-25".into(), 75.0);
+        assert_eq!(d.study_minutes(), 75.0);
+        d.fo.insert("livre:1".into(), 25.0);
+        assert_eq!(d.study_minutes(), 100.0);
         assert!(serde_json::to_value(&d).unwrap().get("notified").is_some());
     }
 

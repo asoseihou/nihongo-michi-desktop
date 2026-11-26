@@ -7,6 +7,7 @@ pub mod anki;
 pub mod atualizar;
 pub mod avisos;
 pub mod dados;
+pub mod focar;
 pub mod frases;
 pub mod hoje;
 pub mod imersao;

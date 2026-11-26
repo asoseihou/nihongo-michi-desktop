@@ -177,7 +177,9 @@ fn tick(app: &AppHandle, startup: bool) -> R<()> {
         db::meta_set(&c, "last_tick", &format!("{now}"))?;
         f
     };
-    if fired.shown > 0 || fired.missed > 0 {
+    // During a focus session the reminders wait in the centre; the popup
+    // opens when the session ends.
+    if (fired.shown > 0 || fired.missed > 0) && !crate::foco::running(app) {
         aviso::show(app);
         if fired.shown > 0 {
             let desk = db::desk(&db.lock());

@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager, Wry};
 pub struct TrayItems {
     next: MenuItem<Wry>,
     pause: MenuItem<Wry>,
+    focus: MenuItem<Wry>,
 }
 
 pub struct TrayState(Mutex<Option<TrayItems>>);
@@ -25,6 +26,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let avisos = MenuItem::with_id(app, "avisos", "🔔 Central de avisos", true, None::<&str>)?;
     let next = MenuItem::with_id(app, "next", "Próximo aviso: —", false, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause", "Pausar avisos por 1 h", true, None::<&str>)?;
+    let focus = MenuItem::with_id(app, "focus", "▶ Foco de 25 min", true, None::<&str>)?;
     let test = MenuItem::with_id(app, "test", "Testar aviso", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
     let menu = Menu::with_items(
@@ -33,6 +35,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             &open,
             &agenda,
             &avisos,
+            &focus,
             &PredefinedMenuItem::separator(app)?,
             &next,
             &pause,
@@ -41,7 +44,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             &quit,
         ],
     )?;
-    app.manage(TrayState(Mutex::new(Some(TrayItems { next, pause }))));
+    app.manage(TrayState(Mutex::new(Some(TrayItems { next, pause, focus }))));
     TrayIconBuilder::with_id("michi")
         .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
         .tooltip("Nihongo Michi")
@@ -52,6 +55,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             "agenda" => events::navigate(app, "agenda", None),
             "avisos" => events::navigate(app, "avisos", None),
             "pause" => toggle_pause(app),
+            "focus" => toggle_focus(app),
             "test" => crate::commands::fire_test(app),
             "quit" => app.exit(0),
             _ => {}
@@ -64,6 +68,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .build(app)?;
     refresh(app);
     Ok(())
+}
+
+fn toggle_focus(app: &AppHandle) {
+    let r = if crate::foco::running(app) {
+        crate::foco::finish(app, false).map(|_| ())
+    } else {
+        crate::foco::start(app, crate::foco::Spec { minutes: 25.0, ..Default::default() }).map(|_| ())
+    };
+    if let Err(e) = r {
+        log::warn!("foco: {e}");
+    }
 }
 
 fn toggle_pause(app: &AppHandle) {
@@ -113,12 +128,18 @@ pub fn refresh(app: &AppHandle) {
         };
         (text, desk.pause_until > now)
     };
+    let focus_text = match crate::foco::current(app).filter(|f| f.active()) {
+        Some(f) => format!("■ Encerrar o foco ({} min restantes)", (f.remaining_ms(now) / 60_000.0).ceil()),
+        None => "▶ Foco de 25 min".to_string(),
+    };
     // Clone the handles and release the lock first: set_text from another
     // thread waits for the main thread, which may be waiting for this lock.
-    let items = state.0.lock().ok().and_then(|g| g.as_ref().map(|i| (i.next.clone(), i.pause.clone())));
-    if let Some((next_item, pause_item)) = items {
+    let items =
+        state.0.lock().ok().and_then(|g| g.as_ref().map(|i| (i.next.clone(), i.pause.clone(), i.focus.clone())));
+    if let Some((next_item, pause_item, focus_item)) = items {
         let _ = next_item.set_text(truncate(&next, 70));
         let _ = pause_item.set_text(if paused { "Retomar avisos" } else { "Pausar avisos por 1 h" });
+        let _ = focus_item.set_text(focus_text);
     }
 }
 

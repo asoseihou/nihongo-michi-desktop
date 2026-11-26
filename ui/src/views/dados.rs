@@ -290,7 +290,13 @@ struct Join {
 }
 
 fn device_line(d: &DeviceInfo) -> String {
-    format!("{} XP · {} dias de estudo · {} cartas SRS", d.xp.round(), d.days, d.cards)
+    let n = |k: usize, one: &str, many: &str| format!("{k} {}", if k == 1 { one } else { many });
+    format!(
+        "{} XP · {} · {}",
+        d.xp.round(),
+        n(d.days, "dia de estudo", "dias de estudo"),
+        n(d.cards, "carta SRS", "cartas SRS")
+    )
 }
 
 /// Runs a sync now: saves what the window holds, syncs, re-reads the data.

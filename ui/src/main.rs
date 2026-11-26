@@ -8,6 +8,7 @@ mod app;
 mod aviso;
 mod data;
 mod docs;
+mod foco;
 mod jp;
 mod logic;
 mod store;
@@ -18,9 +19,9 @@ mod views;
 
 fn main() {
     console_error_panic_hook::set_once();
-    if tauri::window_label() == "aviso" {
-        leptos::mount::mount_to_body(aviso::AvisoApp);
-    } else {
-        leptos::mount::mount_to_body(app::App);
+    match tauri::window_label().as_str() {
+        "aviso" => leptos::mount::mount_to_body(aviso::AvisoApp),
+        "foco" => leptos::mount::mount_to_body(foco::FocoApp),
+        _ => leptos::mount::mount_to_body(app::App),
     }
 }

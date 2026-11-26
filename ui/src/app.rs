@@ -46,6 +46,12 @@ thread_local! {
     static MODALS: RefCell<Vec<Modal>> = const { RefCell::new(Vec::new()) };
     static MODAL_REV: Cell<Option<RwSignal<u64>>> = const { Cell::new(None) };
     static MODAL_ID: Cell<u32> = const { Cell::new(0) };
+    static FOCUS: Cell<Option<RwSignal<Option<michi_core::focus::Focus>>>> = const { Cell::new(None) };
+}
+
+/// The focus session, kept current by the backend's `michi://foco` events.
+pub fn focus_sig() -> RwSignal<Option<michi_core::focus::Focus>> {
+    FOCUS.with(|c| c.get()).expect("focus signal set up")
 }
 
 fn known(r: &str) -> bool {
@@ -376,6 +382,8 @@ pub fn App() -> impl IntoView {
     let sync = RwSignal::new(SyncLook::default());
     let syncing = RwSignal::new(false);
     let upd = RwSignal::new(crate::views::atualizar::UpdStatus::default());
+    let focus = RwSignal::new(None::<michi_core::focus::Focus>);
+    FOCUS.with(|c| c.set(Some(focus)));
     let _ = window_event_listener(leptos::ev::hashchange, move |_| route.set(hash_route()));
     install_global_handlers();
     crate::tts::init();
@@ -393,6 +401,12 @@ pub fn App() -> impl IntoView {
         tauri::listen::<SyncLook>("michi://sync-status", move |look| sync.set(look));
         load_sync_look(sync);
         tauri::listen::<crate::views::atualizar::UpdStatus>("michi://update", move |s| upd.set(s));
+        tauri::listen::<Option<michi_core::focus::Focus>>("michi://foco", move |f| focus.set(f));
+        spawn_local(async move {
+            if let Ok(f) = tauri::invoke::<Option<michi_core::focus::Focus>, _>("foco_state", &tauri::NoArgs {}).await {
+                focus.set(f);
+            }
+        });
     }
 
     spawn_local(async move {

@@ -260,6 +260,9 @@ pub fn maybe_install(app: &AppHandle, window_open: bool) {
     if local::get(&db.lock()).update_install_ask {
         return;
     }
+    if crate::foco::running(app) {
+        return; // never in the middle of a focus session
+    }
     if let Err(e) = install(app, true) {
         log::warn!("atualização: {e}");
     }

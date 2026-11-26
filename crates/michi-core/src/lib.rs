@@ -6,6 +6,7 @@
 pub mod agenda;
 pub mod de;
 pub mod docs;
+pub mod focus;
 pub mod merge;
 pub mod ops;
 pub mod routine;

@@ -219,6 +219,7 @@ pub fn aviso_fit(app: AppHandle, height: f64) {
 pub fn aviso_action(app: AppHandle, db: State<'_, Db>, id: i64, action: String, minutes: Option<f64>) -> R<()> {
     let mut ops: Vec<Op> = vec![];
     let mut nav: Option<(String, Option<String>)> = None;
+    let mut focus: Option<crate::foco::Spec> = None;
     {
         let c = db.lock();
         let a = db::notif_get(&c, id).ok_or("aviso não encontrado")?;
@@ -236,12 +237,28 @@ pub fn aviso_action(app: AppHandle, db: State<'_, Db>, id: i64, action: String, 
                 let block = a.event_id.strip_prefix("rotina-").map(str::to_string);
                 nav = Some((a.go.clone().unwrap_or_else(|| "hoje".into()), block));
             }
+            "focus" => {
+                db::notif_set_status(&c, id, "opened", None)?;
+                let block = a.event_id.strip_prefix("rotina-").map(str::to_string);
+                focus = Some(crate::foco::Spec {
+                    title: a.title.clone(),
+                    jp: a.jp.clone(),
+                    color: a.color.clone(),
+                    minutes: if a.dur > 0 { a.dur as f64 } else { 25.0 },
+                    event_id: if block.is_some() { None } else { Some(a.event_id.clone()) },
+                    occ: if block.is_some() { None } else { Some(a.occ.clone()) },
+                    block,
+                });
+            }
             _ => db::notif_set_status(&c, id, "dismissed", None)?,
         }
     }
     events::patch(&app, &ops);
     if let Some((route, block)) = nav {
         events::navigate(&app, &route, block);
+    }
+    if let Some(spec) = focus {
+        crate::foco::start(&app, spec)?;
     }
     events::avisos_changed(&app);
     wake(&app);

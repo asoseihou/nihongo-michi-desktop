@@ -81,6 +81,21 @@ pub fn notes_html(notes: &str) -> String {
     out
 }
 
+/// The updater's errors are in English and technical; the common ones get
+/// a plain sentence.
+fn friendly_error(e: &str) -> String {
+    let l = e.to_lowercase();
+    if l.contains("valid release json") || l.contains("404") {
+        "Ainda não há versão nova publicada com atualização automática.".into()
+    } else if l.contains("dns") || l.contains("connect") || l.contains("timed out") || l.contains("network") {
+        "Sem conexão com o GitHub agora; o app tenta de novo mais tarde.".into()
+    } else if l.contains("signature") {
+        "A versão encontrada não tem a assinatura do projeto, então não foi instalada.".into()
+    } else {
+        format!("Não consegui verificar: {e}")
+    }
+}
+
 /// Saves what the window holds, then installs (the app closes and reopens).
 pub fn install_now() {
     spawn_local(async {
@@ -162,7 +177,7 @@ pub fn Updates() -> impl IntoView {
                     "ready" => format!("A versão {} está pronta para instalar.", s.version),
                     "installing" => format!("Instalando a versão {}…", s.version),
                     "latest" => format!("Você está na versão mais nova (verificado {}).", when(s.checked_at)),
-                    "error" => format!("Não consegui verificar: {}", s.error),
+                    "error" => friendly_error(&s.error),
                     _ => "Ainda não procurou nesta sessão.".to_string(),
                 };
                 let ready = s.state == "ready";

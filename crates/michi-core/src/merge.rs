@@ -29,6 +29,7 @@ pub fn merge_day(newer: &DayDoc, older: &DayDoc) -> DayDoc {
     d.gp = newer.gp.max(older.gp);
     max_into(&mut d.nw, &older.nw);
     max_into(&mut d.sec, &older.sec);
+    max_into(&mut d.fo, &older.fo);
     for (k, v) in &older.done {
         d.done.entry(k.clone()).or_insert(*v);
     }

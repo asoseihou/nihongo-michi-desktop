@@ -12,6 +12,7 @@ mod datacmd;
 mod db;
 mod events;
 mod files;
+mod foco;
 mod keeper;
 mod local;
 mod pcsync;
@@ -53,6 +54,7 @@ pub fn run() {
             // First sync, then the reminder scheduler, then backups and sync
             // in the background.
             keeper::start(app.handle());
+            foco::start_timer(app.handle());
             Ok(())
         })
         .on_window_event(|w, e| {
@@ -100,6 +102,16 @@ pub fn run() {
             datacmd::update_install,
             datacmd::update_set,
             datacmd::update_seen,
+            foco::foco_state,
+            foco::foco_start,
+            foco::foco_pause,
+            foco::foco_resume,
+            foco::foco_add,
+            foco::foco_stop,
+            foco::foco_mark,
+            foco::foco_close,
+            foco::foco_show,
+            foco::foco_fit,
             commands::aviso_state,
             commands::aviso_fit,
             commands::aviso_action,

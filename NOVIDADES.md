@@ -10,6 +10,10 @@
   outros; o que cada um estudou se junta sozinho.
 - **Atualização automática**: o app procura versões novas, baixa em segundo plano e instala
   quando você fecha a janela (ou na hora, se você pedir). Depois mostra o que mudou.
+- **Modo foco**: o ▶ de cada bloco do quadro de Hoje (ou o cartão Modo foco) abre um cronômetro
+  numa janelinha sempre visível, para estudar fora do app. Os minutos entram sozinhos no quadro de
+  Hoje, na meta e no mapa de calor, e cada 3 minutos dão 1 XP (uma hora de foco já mantém a
+  sequência). Os avisos esperam o foco acabar.
 
 ## v0.1.0
 

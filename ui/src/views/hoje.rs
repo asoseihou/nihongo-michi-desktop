@@ -115,6 +115,7 @@ fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
             let (go_route, bid) = (b.go.clone(), b.id.clone());
             let bid2 = b.id.clone();
             let name = b.name.clone();
+            let (fid, fname, fjp, fmin) = (b.id.clone(), b.name.clone(), b.jp.clone(), b.min);
             let row = view! {
                 <div class="dep" class:done=done class:now=is_now role="listitem"
                     on:click=move |_| go(&go_route, intent_for_block(Some(&bid)))>
@@ -125,6 +126,11 @@ fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
                     </div>
                     <div class="row" style="gap:8px">
                         <span class="st">{label}</span>
+                        <button class="foc-b" title=format!("Modo foco: {} min", fmin) aria-label=format!("Começar foco em {}", fname)
+                            on:click=move |ev: web_sys::MouseEvent| {
+                                ev.stop_propagation();
+                                crate::views::focar::start_block(&fid, &fname, &fjp, fmin);
+                            }>"▶"</button>
                         <input type="checkbox" class="chk" prop:checked=done aria-label=format!("Marcar {name} como feito")
                             on:click=move |ev: web_sys::MouseEvent| {
                                 ev.stop_propagation();
@@ -153,7 +159,7 @@ fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
         } else {
             "—"
         };
-        let (o2, o3) = (o.clone(), o.clone());
+        let (o2, o3, o4) = (o.clone(), o.clone(), o.clone());
         let row = view! {
             <div class="dep" class:done=done class:now=is_now role="listitem" on:click=move |_| crate::views::agenda::open_details(o2.clone())>
                 <div class="t">{o.time.clone()}</div>
@@ -163,6 +169,11 @@ fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
                 </div>
                 <div class="row" style="gap:8px">
                     <span class="st">{label}</span>
+                    <button class="foc-b" title=format!("Modo foco: {} min", o.dur) aria-label=format!("Começar foco em {}", o.title)
+                        on:click=move |ev: web_sys::MouseEvent| {
+                            ev.stop_propagation();
+                            crate::views::focar::start_occ(&o4);
+                        }>"▶"</button>
                     <input type="checkbox" class="chk" prop:checked=done aria-label=format!("Marcar {} como feito", o.title)
                         on:click=move |ev: web_sys::MouseEvent| {
                             ev.stop_propagation();
@@ -391,6 +402,7 @@ fn page(clock: RwSignal<String>, agenda: Vec<Occ>) -> AnyView {
                 <div class="dep"><div class="t">"—"</div><div class="w">"Nenhum bloco marcado para hoje. Use “Ajustar horários” para escolher os dias."</div></div>
             })}
         </div>
+        <crate::views::focar::FocusCard/>
         <div class="grid2">
             {station_card}
             <div class="card stack">
