@@ -172,6 +172,12 @@ pub fn card_put(c: &Connection, id: &str, card: Option<&Card>) -> R<()> {
 
 /// Saves (or deletes, leaving a tombstone) one SRS card.
 pub fn card_put_at(c: &Connection, id: &str, card: Option<&Card>, t: i64) -> R<()> {
+    let clean = card.copied().map(|mut k| (k.sanitize(), k));
+    if matches!(clean, Some((false, _))) || id.len() > 300 {
+        return Ok(()); // not finite or absurd id: skipped
+    }
+    let clean = clean.map(|(_, k)| k);
+    let card = clean.as_ref();
     match card {
         Some(k) => {
             let a = k.0;
@@ -224,18 +230,26 @@ fn event_of(r: &Row) -> rusqlite::Result<Event> {
 pub fn events_all(c: &Connection) -> R<Vec<Event>> {
     let mut st = c.prepare("SELECT * FROM events ORDER BY date, time").map_err(err)?;
     let rows = st.query_map([], event_of).map_err(err)?;
-    Ok(rows.flatten().collect())
+    Ok(rows.flatten().filter_map(|mut e| e.sanitize().then_some(e)).collect())
 }
 
 pub fn event_get(c: &Connection, id: &str) -> Option<Event> {
-    c.query_row("SELECT * FROM events WHERE id=?1", [id], event_of).optional().ok().flatten()
+    let mut e = c.query_row("SELECT * FROM events WHERE id=?1", [id], event_of).optional().ok().flatten()?;
+    e.sanitize().then_some(e)
 }
 
 pub fn event_put(c: &Connection, e: &Event) -> R<()> {
     event_put_at(c, e, now())
 }
 
+/// Stores an event within safe limits; an unusable one (bad date) is skipped.
 pub fn event_put_at(c: &Connection, e: &Event, t: i64) -> R<()> {
+    let mut clean = e.clone();
+    if !clean.sanitize() {
+        log::warn!("evento ignorado (dados inválidos): {}", e.id.chars().take(60).collect::<String>());
+        return Ok(());
+    }
+    let e = &clean;
     c.execute(
         "INSERT INTO events(id,kind,title,jp,notes,all_day,date,time,dur,rrule,exdates,reminders,color,go,source,source_id,overrides,off,created_at,updated_at)
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?19)

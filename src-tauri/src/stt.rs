@@ -6,6 +6,7 @@
 use crate::db::{err, R};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use serde::Serialize;
+use sha2::Digest;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Sender};
@@ -15,8 +16,13 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 const MODEL_FILE: &str = "ggml-small-q5_1.bin";
-const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin";
-const MODEL_MB: u64 = 190;
+/// Pinned to one revision of the repository, and checked byte by byte
+/// (size and SHA-256) before whisper.cpp ever reads it.
+const MODEL_URL: &str =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin";
+const MODEL_SIZE: u64 = 190_085_487;
+const MODEL_MB: u64 = MODEL_SIZE / 1_000_000;
+const MODEL_SHA256: &str = "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb";
 /// Longest recording kept (seconds).
 const MAX_SECS: u64 = 30;
 
@@ -86,14 +92,16 @@ fn download(app: &AppHandle) -> R<()> {
     let path = model_path(app)?;
     std::fs::create_dir_all(path.parent().unwrap()).map_err(err)?;
     let tmp = path.with_extension("part");
-    let resp = ureq::get(MODEL_URL).call().map_err(|e| format!("não consegui baixar o modelo: {e}"))?;
-    let total = resp
-        .headers()
-        .get("content-length")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(MODEL_MB * 1_000_000);
-    let mut reader = resp.into_body().into_reader();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(std::time::Duration::from_secs(20)))
+        .timeout_recv_body(Some(std::time::Duration::from_secs(30 * 60)))
+        .build()
+        .into();
+    let resp = agent.get(MODEL_URL).call().map_err(|e| format!("não consegui baixar o modelo: {e}"))?;
+    let total = MODEL_SIZE;
+    let mut body = resp.into_body();
+    let mut reader = body.with_config().limit(MODEL_SIZE + 1).reader();
+    let mut hasher = sha2::Sha256::new();
     let mut file = std::fs::File::create(&tmp).map_err(err)?;
     let mut buf = vec![0u8; 256 * 1024];
     let (mut done, mut last) = (0u64, 0u64);
@@ -103,6 +111,7 @@ fn download(app: &AppHandle) -> R<()> {
             break;
         }
         file.write_all(&buf[..n]).map_err(err)?;
+        sha2::Digest::update(&mut hasher, &buf[..n]);
         done += n as u64;
         if done - last > total / 100 {
             last = done;
@@ -111,9 +120,10 @@ fn download(app: &AppHandle) -> R<()> {
     }
     file.flush().map_err(err)?;
     drop(file);
-    if done < total * 9 / 10 {
+    let digest: String = sha2::Digest::finalize(hasher).iter().map(|b| format!("{b:02x}")).collect();
+    if done != MODEL_SIZE || digest != MODEL_SHA256 {
         let _ = std::fs::remove_file(&tmp);
-        return Err("o download veio incompleto; tente de novo".into());
+        return Err("o arquivo baixado não confere com o modelo esperado; tente de novo".into());
     }
     std::fs::rename(&tmp, &path).map_err(err)?;
     Ok(())

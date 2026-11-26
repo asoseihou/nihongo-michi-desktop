@@ -14,6 +14,23 @@ const MIN_MS: f64 = 60_000.0;
 pub struct Card(pub [f64; 7]);
 
 impl Card {
+    /// Keeps a card's numbers sane (cards also arrive from backups and other
+    /// PCs). False when it cannot be used (not finite).
+    pub fn sanitize(&mut self) -> bool {
+        if !self.0.iter().all(|x| x.is_finite()) {
+            return false;
+        }
+        let a = &mut self.0;
+        a[0] = a[0].clamp(0.0, 7.3e12); // due: up to year 2200
+        a[1] = a[1].clamp(0.0, 36_500.0);
+        a[2] = a[2].clamp(1300.0, 5000.0);
+        a[3] = a[3].clamp(0.0, 1e6);
+        a[4] = a[4].clamp(0.0, 1e6);
+        a[5] = a[5].round().clamp(0.0, 3.0);
+        a[6] = a[6].round().clamp(0.0, 10.0);
+        true
+    }
+
     pub fn due(&self) -> f64 {
         self.0[0]
     }

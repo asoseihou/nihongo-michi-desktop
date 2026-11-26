@@ -63,6 +63,10 @@ pub fn export(c: &Connection) -> R<Value> {
 
 /// Reads and checks a backup file without touching the database.
 pub fn inspect(path: &str) -> R<(Value, BackupInfo)> {
+    let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    if size > 64 * 1024 * 1024 {
+        return Err("o arquivo é grande demais para um backup do Michi".into());
+    }
     let text = std::fs::read_to_string(path).map_err(|e| format!("não consegui abrir o arquivo: {e}"))?;
     let j: Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
         .map_err(|e| format!("o arquivo não é JSON válido: {e}"))?;

@@ -361,31 +361,42 @@ pub fn start_timer(app: &AppHandle) {
     app.manage(FocusTimer(Mutex::new(tx)));
     let app = app.clone();
     std::thread::spawn(move || {
-        recover(&app);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| recover(&app)));
         loop {
-            let wait = match current(&app) {
-                Some(f) if f.state == "running" => {
-                    let now = now_ms();
-                    let left = f.remaining_ms(now);
-                    if left <= 0.0 {
-                        if let Err(e) = finish(&app, true) {
-                            log::warn!("foco: {e}");
-                        }
-                        continue;
-                    }
-                    if now - f.beat_at >= BEAT_MS {
-                        let _ = update_quiet(&app, now);
-                    }
-                    left.min(BEAT_MS)
-                }
-                _ => 3_600_000.0,
-            };
+            // A bug in one round must not stop the timer for good.
+            let step = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| next_wait(&app)));
+            let wait = step.unwrap_or(60_000.0);
             match rx.recv_timeout(Duration::from_millis(wait.max(50.0) as u64)) {
                 Ok(()) | Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => break,
             }
         }
     });
+}
+
+/// One timer round: ends a session whose time ran out, saves the heartbeat,
+/// and says how long to sleep (ms).
+fn next_wait(app: &AppHandle) -> f64 {
+    loop {
+        let wait = match current(app) {
+            Some(f) if f.state == "running" => {
+                let now = now_ms();
+                let left = f.remaining_ms(now);
+                if left <= 0.0 {
+                    if let Err(e) = finish(app, true) {
+                        log::warn!("foco: {e}");
+                    }
+                    continue;
+                }
+                if now - f.beat_at >= BEAT_MS {
+                    let _ = update_quiet(app, now);
+                }
+                left.min(BEAT_MS)
+            }
+            _ => 3_600_000.0,
+        };
+        return wait;
+    }
 }
 
 /// Saves the heartbeat without telling the windows.

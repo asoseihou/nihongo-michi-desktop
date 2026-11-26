@@ -134,7 +134,16 @@ pub fn days_label(days: &[u8]) -> String {
 /// The routine stored in the profile, or the default one (`routine()`).
 pub fn routine_of(stored: &Option<Vec<Block>>) -> Vec<Block> {
     match stored {
-        Some(r) if !r.is_empty() => r.clone(),
+        Some(r) if !r.is_empty() => r
+            .iter()
+            .take(40)
+            .cloned()
+            .map(|mut b| {
+                // Blocks also arrive from backups and other PCs.
+                b.min = if b.min.is_finite() { b.min.clamp(0.0, 600.0) } else { 0.0 };
+                b
+            })
+            .collect(),
         _ => routine_default(),
     }
 }

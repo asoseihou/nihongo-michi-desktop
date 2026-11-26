@@ -39,8 +39,11 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || {
         let mut startup = true;
         loop {
-            if let Err(e) = tick(&app, startup) {
-                log::warn!("scheduler: {e}");
+            // A bug in one tick must not silence the reminders for good.
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tick(&app, startup))) {
+                Ok(Err(e)) => log::warn!("scheduler: {e}"),
+                Err(_) => log::error!("scheduler: um tick falhou (panic)"),
+                Ok(Ok(())) => {}
             }
             startup = false;
             match rx.recv_timeout(std::time::Duration::from_secs(TICK_SECS)) {

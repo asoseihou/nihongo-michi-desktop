@@ -89,13 +89,16 @@ fn cutoff_time() -> NaiveTime {
 
 /// `addDaysStart(n, t)`.
 pub fn add_days_start(n: i64, ms: f64) -> f64 {
-    ms_of((study_date(ms) + Duration::days(n)).and_time(cutoff_time()))
+    // A card imported with an absurd interval must not overflow the date.
+    let d = study_date(ms);
+    let d = d.checked_add_signed(Duration::days(n.clamp(-100_000, 100_000))).unwrap_or(d);
+    ms_of(d.and_time(cutoff_time()))
 }
 
 /// `keyAdd(k, n)`.
 pub fn key_add(k: &str, n: i64) -> String {
     match parse_key(k) {
-        Some(d) => key_of(d + Duration::days(n)),
+        Some(d) => key_of(d.checked_add_signed(Duration::days(n.clamp(-100_000, 100_000))).unwrap_or(d)),
         None => k.to_string(),
     }
 }

@@ -136,13 +136,16 @@ pub async fn backup_pick(app: AppHandle) -> R<Option<BackupInfo>> {
     };
     let path = path.into_path().map_err(db::err)?;
     let (_, info) = backup::inspect(&path.display().to_string())?;
+    crate::datacmd::allow_path(&app, &path);
     Ok(Some(info))
 }
 
 /// Restores a backup. A safety copy of the current progress is saved first,
 /// and with the sync on the restored progress replaces the other PCs' too.
+/// Only a file picked in the dialog or one in the backup folders.
 #[tauri::command]
 pub fn backup_apply(app: AppHandle, db: State<'_, Db>, path: String) -> R<()> {
+    crate::datacmd::check_backup_path(&app, &path)?;
     let (j, _) = backup::inspect(&path)?;
     {
         let mut c = db.lock();
@@ -363,8 +366,8 @@ pub fn autostart_set(app: AppHandle, on: bool) -> R<bool> {
 
 #[tauri::command]
 pub fn open_external(app: AppHandle, url: String) -> R<()> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("só links http(s)".into());
+    if !url.starts_with("https://") {
+        return Err("só links https".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(db::err)
 }

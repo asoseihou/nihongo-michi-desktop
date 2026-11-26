@@ -30,9 +30,17 @@ pub async fn open_text(app: AppHandle, exts: Vec<String>) -> R<Option<String>> {
     Ok(Some(String::from_utf8_lossy(&bytes).trim_start_matches('\u{feff}').to_string()))
 }
 
+/// AnkiConnect actions the Anki screen uses. Calls from here skip
+/// AnkiConnect's browser-origin check, so nothing else goes through (no file
+/// media, no exports, no URLs).
+const ANKI_ACTIONS: [&str; 6] = ["version", "deckNames", "createDeck", "addNotes", "findCards", "cardsInfo"];
+
 /// One AnkiConnect call (`{action, version: 6, params}`).
 #[tauri::command]
 pub async fn anki_connect(action: String, params: Option<Value>) -> R<Value> {
+    if !ANKI_ACTIONS.contains(&action.as_str()) {
+        return Err(format!("ação do AnkiConnect não permitida: {action}"));
+    }
     let body = json!({"action": action, "version": 6, "params": params.unwrap_or_else(|| json!({}))});
     let agent: ureq::Agent =
         ureq::Agent::config_builder().timeout_global(Some(std::time::Duration::from_secs(12))).build().into();

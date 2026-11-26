@@ -475,12 +475,24 @@ fn sync_files(dir: &Path) -> Vec<PathBuf> {
     v
 }
 
+/// A sync file larger than this is not read (a whole progress is a few MB).
+const MAX_FILE: u64 = 64 * 1024 * 1024;
+
 pub fn read_snapshot(p: &Path) -> R<Snapshot> {
+    let size = std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+    if size > MAX_FILE {
+        return Err(format!("{} é grande demais para um arquivo de sincronização", p.display()));
+    }
     let text = std::fs::read_to_string(p).map_err(|e| format!("não consegui ler {}: {e}", p.display()))?;
     let s: Snapshot = serde_json::from_str(text.trim_start_matches('\u{feff}'))
         .map_err(|e| format!("arquivo de sincronização inválido ({}): {e}", p.display()))?;
     if s.app != FORMAT || s.v != 1 {
         return Err(format!("{} não é um arquivo de sincronização do Michi", p.display()));
+    }
+    // An epoch is the time of a reset or restore: one from the future would
+    // make every PC replace its progress with that file forever.
+    if s.epoch < 0 || s.epoch as f64 > now_ms() + 86_400_000.0 {
+        return Err(format!("{} tem uma data de época inválida", p.display()));
     }
     Ok(s)
 }
@@ -1122,7 +1134,7 @@ mod tests {
             assert_eq!(db::profile(&c).xp, 150.0, "profile total covers the new day");
         }
         assert_eq!(slug("MESA-01"), "mesa-01");
-        assert_eq!(slug("Notebook do Luís"), "notebook-do-lu-s");
+        assert_eq!(slug("Notebook do Escritório"), "notebook-do-escrit-rio");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

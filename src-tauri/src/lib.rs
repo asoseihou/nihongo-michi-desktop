@@ -41,6 +41,7 @@ pub fn run() {
             app.manage(db);
             app.manage(stt::Stt::default());
             app.manage(pcsync::SyncState::default());
+            app.manage(datacmd::Picked::default());
             // Right after an update, the new version says what changed; one
             // installed while the window was closed starts in the tray.
             let just = updater::take_marker(app.handle());

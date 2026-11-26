@@ -11,6 +11,50 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+/// Paths the learner picked in a file dialog during this run. Commands that
+/// take a path from the window only accept these (or the app's own backup
+/// folders), so a page script could never point them anywhere else.
+#[derive(Default)]
+pub struct Picked(std::sync::Mutex<std::collections::HashSet<PathBuf>>);
+
+fn norm(p: &std::path::Path) -> PathBuf {
+    std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+}
+
+pub fn allow_path(app: &AppHandle, p: &std::path::Path) {
+    if let Some(st) = app.try_state::<Picked>() {
+        st.0.lock().unwrap_or_else(|e| e.into_inner()).insert(norm(p));
+    }
+}
+
+fn picked(app: &AppHandle, p: &std::path::Path) -> bool {
+    app.try_state::<Picked>()
+        .map(|st| st.0.lock().unwrap_or_else(|e| e.into_inner()).contains(&norm(p)))
+        .unwrap_or(false)
+}
+
+/// A backup to inspect or restore: picked in the dialog, or inside one of
+/// the backup folders (automatic backups and safety copies).
+pub fn check_backup_path(app: &AppHandle, path: &str) -> R<()> {
+    let p = std::path::Path::new(path);
+    if picked(app, p) {
+        return Ok(());
+    }
+    let file = norm(p);
+    let db = app.state::<Db>();
+    let l = local::get(&db.lock());
+    let mut dirs = vec![autobackup::dir_of(app, &l)];
+    if let Ok(d) = app.path().app_data_dir() {
+        dirs.push(d.join("backups"));
+    }
+    let inside = dirs.iter().any(|d| file.parent().map(|f| f == norm(d)).unwrap_or(false));
+    if inside && file.extension().map(|e| e == "json").unwrap_or(false) {
+        Ok(())
+    } else {
+        Err("esse arquivo não foi escolhido por você".into())
+    }
+}
+
 fn poke(app: &AppHandle) {
     if let Some(k) = app.try_state::<Keeper>() {
         k.poke();
@@ -68,7 +112,8 @@ pub async fn backup_auto_now(app: AppHandle, db: State<'_, Db>) -> R<autobackup:
 
 /// Restore confirmation for a backup picked from the list.
 #[tauri::command]
-pub fn backup_inspect(path: String) -> R<BackupInfo> {
+pub fn backup_inspect(app: AppHandle, path: String) -> R<BackupInfo> {
+    check_backup_path(&app, &path)?;
     autobackup::inspect(&path)
 }
 
@@ -100,6 +145,7 @@ pub async fn sync_pick_dir(app: AppHandle) -> R<Option<pcsync::Preview>> {
         return Ok(None);
     };
     let dir = dir.into_path().map_err(err)?;
+    allow_path(&app, &dir);
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || pcsync::preview(&a, &dir).map(Some)).await.map_err(err)?
 }
@@ -107,6 +153,9 @@ pub async fn sync_pick_dir(app: AppHandle) -> R<Option<pcsync::Preview>> {
 /// `how`: "merge", "adopt" or "mine" (see `pcsync::join`).
 #[tauri::command]
 pub async fn sync_join(app: AppHandle, dir: String, how: String) -> R<pcsync::Report> {
+    if !picked(&app, std::path::Path::new(&dir)) {
+        return Err("escolha a pasta pelo botão Escolher pasta".into());
+    }
     let a = app.clone();
     let r =
         tauri::async_runtime::spawn_blocking(move || pcsync::join(&a, &PathBuf::from(dir), &how)).await.map_err(err)?;

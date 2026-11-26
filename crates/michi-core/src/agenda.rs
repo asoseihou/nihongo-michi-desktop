@@ -7,7 +7,7 @@ use crate::routine::Block;
 use crate::rrule::RRule;
 use crate::time::{key_of, parse_hhmm, parse_key};
 use crate::trip;
-use chrono::{Duration, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -123,6 +123,28 @@ fn user_source() -> String {
     "user".into()
 }
 
+/// Longest event (a year) and earliest reminder (a week before): far from
+/// chrono's limits, so no date arithmetic on an event can overflow.
+pub const MAX_DUR_MIN: i64 = 366 * 1440;
+pub const MAX_REMIND_MIN: i64 = 7 * 1440;
+const MAX_LIST: usize = 2000;
+
+/// `#rgb`, `#rrggbb` or `#rrggbbaa` only: colors end up in style attributes.
+pub fn safe_color(c: &str) -> bool {
+    let h = c.strip_prefix('#').unwrap_or("");
+    matches!(h.len(), 3 | 4 | 6 | 8) && h.chars().all(|x| x.is_ascii_hexdigit())
+}
+
+fn sane_date(s: &str) -> bool {
+    parse_key(s).map(|d| (1970..=2200).contains(&d.year())).unwrap_or(false)
+}
+
+fn clip(s: &mut String, max: usize) {
+    if s.chars().count() > max {
+        *s = s.chars().take(max).collect();
+    }
+}
+
 /// A concrete occurrence, ready for the calendar views.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Occ {
@@ -180,6 +202,46 @@ impl Occ {
 }
 
 impl Event {
+    /// Keeps the event inside safe limits. Events also arrive from backups
+    /// and from other PCs' sync files, so every stored event goes through
+    /// this. Returns false when the event is unusable (no id, bad date).
+    pub fn sanitize(&mut self) -> bool {
+        if self.id.trim().is_empty() || self.id.len() > 200 || !sane_date(&self.date) {
+            return false;
+        }
+        clip(&mut self.title, 300);
+        clip(&mut self.jp, 60);
+        clip(&mut self.notes, 5000);
+        self.dur = self.dur.clamp(0, MAX_DUR_MIN);
+        if !self.time.is_empty() && parse_hhmm(&self.time).is_none() {
+            self.time = "09:00".into();
+        }
+        self.reminders.retain(|m| (0..=MAX_REMIND_MIN).contains(m));
+        self.reminders.sort_unstable();
+        self.reminders.dedup();
+        self.reminders.truncate(12);
+        self.exdates.retain(|d| sane_date(d));
+        self.exdates.truncate(MAX_LIST);
+        self.overrides.retain(|o| sane_date(&o.occ) && sane_date(&o.date));
+        for o in &mut self.overrides {
+            o.dur = o.dur.clamp(0, MAX_DUR_MIN);
+            if !o.time.is_empty() && parse_hhmm(&o.time).is_none() {
+                o.time.clear();
+            }
+        }
+        self.overrides.truncate(MAX_LIST);
+        if self.rrule.as_deref().map(|r| RRule::parse(r).is_none()).unwrap_or(false) {
+            self.rrule = None;
+        }
+        if self.color.as_deref().map(|c| !safe_color(c)).unwrap_or(false) {
+            self.color = None;
+        }
+        if let Some(g) = &mut self.go {
+            clip(g, 40);
+        }
+        true
+    }
+
     pub fn rule(&self) -> Option<RRule> {
         self.rrule.as_deref().and_then(RRule::parse)
     }
@@ -462,5 +524,50 @@ mod tests {
         assert!(s.is_quiet(NaiveTime::from_hms_opt(6, 59, 0).unwrap()));
         assert!(!s.is_quiet(NaiveTime::from_hms_opt(7, 0, 0).unwrap()));
         assert!(!s.is_quiet(NaiveTime::from_hms_opt(21, 30, 0).unwrap()));
+    }
+}
+
+#[cfg(test)]
+mod limits_tests {
+    use super::*;
+    use crate::Card;
+
+    #[test]
+    fn absurd_events_are_tamed_not_fatal() {
+        let j = r##"{"id":"x","kind":"meu","title":"t","date":"2026-11-26","time":"25:99","dur":1000000000000,
+            "rrule":"FREQ=DAILY;INTERVAL=4000000000;COUNT=99999999","reminders":[-5,10,999999999999],
+            "exdates":["99999-01-01","2026-11-27"],"color":"red;background:url(https://x.y/z)",
+            "overrides":[{"occ":"2026-11-26","date":"2026-11-26","time":"09:00","dur":9000000000000}]}"##;
+        let mut e: Event = serde_json::from_str(j).unwrap();
+        assert!(e.sanitize());
+        assert_eq!(e.dur, MAX_DUR_MIN);
+        assert_eq!(e.time, "09:00");
+        assert_eq!(e.reminders, vec![10]);
+        assert_eq!(e.exdates, vec!["2026-11-27".to_string()]);
+        assert!(e.color.is_none(), "only #hex colors reach style attributes");
+        assert_eq!(e.overrides[0].dur, MAX_DUR_MIN);
+        let r = e.rule().unwrap();
+        assert_eq!((r.interval, r.count), (1000, Some(10_000)));
+        // Expanding over a wide range neither panics nor runs away.
+        let from = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2030, 12, 31).unwrap();
+        let _ = e.expand(from, to);
+
+        let mut bad: Event =
+            serde_json::from_str(r#"{"id":"y","kind":"meu","title":"t","date":"30000-01-01","dur":5}"#).unwrap();
+        assert!(!bad.sanitize(), "a date outside 1970–2200 is refused");
+        assert!(safe_color("#0a9a8f") && safe_color("#fff") && !safe_color("url(x)") && !safe_color("#12345"));
+    }
+
+    #[test]
+    fn absurd_cards_are_tamed() {
+        let mut c = Card([1e300, 1e15, 1.0, -4.0, 7.0, 9.0, 1e9]);
+        assert!(c.sanitize());
+        assert_eq!(c.0, [7.3e12, 36_500.0, 1300.0, 0.0, 7.0, 3.0, 10.0]);
+        assert!(!Card([f64::NAN, 0.0, 2500.0, 0.0, 0.0, 0.0, 0.0]).sanitize());
+        // Scheduling a card with a huge interval does not overflow the date.
+        let next = crate::srs::schedule(Some(&Card([0.0, 36_500.0, 2500.0, 3.0, 0.0, 2.0, 0.0])), 1, 1.7e12, 0.5);
+        assert!(next.due().is_finite());
+        assert_eq!(crate::time::key_add("2026-11-26", i64::MAX), crate::time::key_add("2026-11-26", 100_000));
     }
 }

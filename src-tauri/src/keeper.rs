@@ -136,7 +136,7 @@ pub fn start(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         // The window is still loading: the first sync may change anything.
-        run_sync(&app, true);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_sync(&app, true)));
         ready.set();
         crate::scheduler::start(&app);
         let started = Instant::now();
@@ -150,18 +150,24 @@ pub fn start(app: &AppHandle) {
                 // Let the window save what it still holds before reading it back.
                 std::thread::sleep(Duration::from_secs(3));
             }
-            if started.elapsed() >= BACKUP_DELAY {
-                if let Err(e) = autobackup::run_daily(&app) {
-                    log::warn!("backup: {e}");
+            // A bug in one round must not stop backups, sync and updates for good.
+            let round = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if started.elapsed() >= BACKUP_DELAY {
+                    if let Err(e) = autobackup::run_daily(&app) {
+                        log::warn!("backup: {e}");
+                    }
                 }
+                if matches!(msg, Msg::Hidden) || sync_wanted(&app) {
+                    run_sync(&app, !window_open(&app));
+                }
+                if crate::updater::due(&app, started) {
+                    let _ = tauri::async_runtime::block_on(crate::updater::check(&app, false));
+                }
+                crate::updater::maybe_install(&app, window_open(&app));
+            }));
+            if round.is_err() {
+                log::error!("keeper: uma rodada falhou (panic); segue na próxima");
             }
-            if matches!(msg, Msg::Hidden) || sync_wanted(&app) {
-                run_sync(&app, !window_open(&app));
-            }
-            if crate::updater::due(&app, started) {
-                let _ = tauri::async_runtime::block_on(crate::updater::check(&app, false));
-            }
-            crate::updater::maybe_install(&app, window_open(&app));
         }
     });
 }

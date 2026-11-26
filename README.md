@@ -96,8 +96,9 @@ Cada tag `v*` enviada ao GitHub dispara o workflow **Release**, que compila no W
 publica o instalador na página de Releases. O workflow **CI** roda os testes a cada push.
 
 O texto da release é a seção da versão em [NOVIDADES.md](NOVIDADES.md) (o app mostra essa parte
-depois de se atualizar). O instalador e o `latest.json` da atualização automática são assinados
-com a chave do projeto, guardada nos secrets `TAURI_SIGNING_PRIVATE_KEY` e
+depois de se atualizar). O instalador é assinado com a chave do projeto (arquivo `.sig`, listado no
+`latest.json`) e o app só instala uma atualização se a assinatura conferir com a chave pública do
+`tauri.conf.json`. A chave fica nos secrets `TAURI_SIGNING_PRIVATE_KEY` e
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` do repositório. A chave fica fora do repositório, em
 `%USERPROFILE%\.tauri`, e o `tools/dev-env.ps1` a carrega para o `cargo tauri build` local.
 

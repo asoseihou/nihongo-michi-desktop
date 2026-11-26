@@ -3,7 +3,6 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 # Writes the release; the signing key reaches only the build step. Third-party
 # actions are pinned to a commit (the tag in the comment).
@@ -17,17 +16,20 @@ jobs:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: wasm32-unknown-unknown
 
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      # No build cache here: this job receives the signing key, so it builds
+      # from a clean slate (slower, nothing restored from other runs).
 
       - name: Trunk e tauri-cli
         uses: taiki-e/install-action@893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e # v2
         with:
-          tool: trunk,tauri-cli@2
+          tool: trunk@0.22.2,tauri-cli@2.12.6
 
       # The release text: this version's section of NOVIDADES.md, then how to
       # install. The app shows the first part after updating itself.

@@ -96,7 +96,8 @@ impl RRule {
                         _ => return None,
                     }
                 }
-                "INTERVAL" => r.interval = v.trim().parse::<u32>().ok()?.max(1),
+                // Bounded so date steps stay far from chrono's limits.
+                "INTERVAL" => r.interval = v.trim().parse::<u32>().ok()?.clamp(1, 1000),
                 "BYDAY" => {
                     for c in v.split(',') {
                         let c = c.trim().to_ascii_uppercase();
@@ -114,7 +115,7 @@ impl RRule {
                     let d = v.get(..8)?;
                     r.until = NaiveDate::parse_from_str(d, "%Y%m%d").ok();
                 }
-                "COUNT" => r.count = v.trim().parse().ok(),
+                "COUNT" => r.count = v.trim().parse::<u32>().ok().map(|c| c.min(10_000)),
                 _ => {}
             }
         }
