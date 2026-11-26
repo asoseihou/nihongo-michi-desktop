@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Third-party actions are pinned to a commit (the tag in the comment), so a
+# moved tag upstream cannot change what runs here.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: windows-latest
@@ -13,14 +18,14 @@ jobs:
       # whisper.cpp (whisper-rs) needs CMake and libclang; both come with the runner.
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: wasm32-unknown-unknown
           components: rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Formatação
         run: cargo fmt --all -- --check

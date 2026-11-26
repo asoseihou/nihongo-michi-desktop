@@ -5,6 +5,8 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Writes the release; the signing key reaches only the build step. Third-party
+# actions are pinned to a commit (the tag in the comment).
 permissions:
   contents: write
 
@@ -14,16 +16,16 @@ jobs:
     env:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: wasm32-unknown-unknown
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Trunk e tauri-cli
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e # v2
         with:
           tool: trunk,tauri-cli@2
 
@@ -48,7 +50,7 @@ jobs:
       # The updater files (.sig and latest.json) are signed with the project's
       # key, kept in the repository secrets; the app only installs what it signs.
       - name: Instalador e release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

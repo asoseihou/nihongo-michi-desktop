@@ -117,7 +117,7 @@ crates/michi-core   lógica compartilhada (nativo + wasm): dia de estudo às 04:
 src-tauri           backend: SQLite + migrações, comandos, agendador, bandeja, janela de aviso, som,
                     voz (cpal + Whisper), arquivos e AnkiConnect
 ui                  interface Leptos (Trunk): shell, telas, janela de aviso; ui/data = dados embutidos
-tools               scripts auxiliares (ícones)
+tools               dev-env.ps1: CMake, libclang e a chave de assinatura para compilar
 ```
 
 ## Dados e licenças
