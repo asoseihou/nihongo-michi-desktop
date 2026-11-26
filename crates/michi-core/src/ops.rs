@@ -11,7 +11,8 @@ pub enum Op {
     Done { day: String, id: String, v: bool },
     /// `profile.xp += n; day.xp += n`
     Xp { day: String, n: f64 },
-    /// `day.ag[key] = min` (None removes)
+    /// `day.ag[key] = min` (None zeroes it: a 0 survives the sync between
+    /// PCs, where a missing key would bring the old credit back)
     Ag { day: String, key: String, min: Option<f64> },
 }
 
@@ -32,14 +33,9 @@ impl Op {
                 d.done.insert(id.clone(), *v);
             }
             Op::Xp { n, .. } => d.xp += n,
-            Op::Ag { key, min, .. } => match min {
-                Some(m) => {
-                    d.ag.insert(key.clone(), *m);
-                }
-                None => {
-                    d.ag.remove(key);
-                }
-            },
+            Op::Ag { key, min, .. } => {
+                d.ag.insert(key.clone(), min.unwrap_or(0.0));
+            }
         }
     }
 

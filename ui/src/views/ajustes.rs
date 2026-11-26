@@ -8,6 +8,7 @@ use crate::store;
 use crate::tauri::{self, NoArgs};
 use crate::tts;
 use crate::util::{clamp, ev_checked, ev_value, scroll_into_view};
+use crate::views::dados::{reload_all, restore_banner, BackupInfo};
 use leptos::prelude::*;
 use michi_core::routine::{days_label, routine_default, routine_of, Block, ALLDAYS, WEEK, WEEK1, WEEK_ORDER};
 use michi_core::time::minutes_of;
@@ -17,8 +18,16 @@ use wasm_bindgen_futures::spawn_local;
 #[component]
 pub fn Ajustes() -> impl IntoView {
     let intent = take_intent();
-    if intent.as_ref().and_then(|i| i.get("focus")).and_then(|v| v.as_str()) == Some("rotina") {
-        set_timeout(|| scroll_into_view("rotina"), std::time::Duration::from_millis(60));
+    if let Some(f) = intent.as_ref().and_then(|i| i.get("focus")).and_then(|v| v.as_str()) {
+        let id = match f {
+            "rotina" => "rotina",
+            "sincronizar" => "sincronizar",
+            "backups" => "backups",
+            _ => "",
+        };
+        if !id.is_empty() {
+            set_timeout(move || scroll_into_view(id), std::time::Duration::from_millis(60));
+        }
     }
     view! {
         <h1>"Ajustes"</h1>
@@ -26,6 +35,7 @@ pub fn Ajustes() -> impl IntoView {
         <Routine/>
         <Reminders/>
         <Data/>
+        <div class="grid2"><crate::views::dados::AutoBackup/><crate::views::dados::PcSync/></div>
         <Credits/>
     }
 }
@@ -465,32 +475,10 @@ fn Reminders() -> impl IntoView {
 
 /* ---------------- data ---------------- */
 
-#[derive(Deserialize, Clone, Debug)]
-struct BackupInfo {
-    path: String,
-    at: f64,
-    name: String,
-    xp: f64,
-    days: usize,
-    cards: usize,
-    desktop: bool,
-}
-
 #[derive(Deserialize, Clone, Debug, Default)]
 struct AppInfo {
     version: String,
     data_dir: String,
-}
-
-#[derive(Serialize)]
-struct PathArg {
-    path: String,
-}
-
-async fn reload_all() {
-    let _ = store::load().await;
-    tts::pick();
-    store::refresh();
 }
 
 #[component]
@@ -522,24 +510,9 @@ fn Data() -> impl IntoView {
             }
         });
     };
-    let apply = move |_| {
-        let Some(i) = pending.get_untracked() else { return };
-        spawn_local(async move {
-            store::flush();
-            match tauri::invoke::<(), _>("backup_apply", &PathArg { path: i.path }).await {
-                Ok(()) => {
-                    pending.set(None);
-                    reload_all().await;
-                    toast("Backup restaurado.", "ok");
-                    crate::app::go("hoje", None);
-                }
-                Err(e) => toast(&format!("Não consegui restaurar: {e}"), "bad"),
-            }
-        });
-    };
     let reset = move |_| {
         spawn_local(async move {
-            store::flush();
+            store::flush_now().await;
             match tauri::invoke::<(), _>("reset_progress", &NoArgs {}).await {
                 Ok(()) => {
                     confirm_reset.set(false);
@@ -554,31 +527,17 @@ fn Data() -> impl IntoView {
     view! {
         <div class="card stack">
             <h2>"Seus dados"</h2>
-            <p class="small muted">"Status: "<b>"salvo neste PC (SQLite)"</b>". O backup usa o mesmo formato da versão web do Nihongo Michi: dá para restaurar aqui o arquivo de "<b>"Ajustes → 💾 Exportar backup"</b>" da versão web, e o backup daqui também abre lá."</p>
+            <p class="small muted">"Status: "<b>"salvo neste PC (SQLite)"</b>", com backup automático todo dia (abaixo). O backup usa o mesmo formato da versão web do Nihongo Michi: dá para restaurar aqui o arquivo de "<b>"Ajustes → 💾 Exportar backup"</b>" da versão web, e o backup daqui também abre lá."</p>
             <div class="row">
                 <button class="btn sm" on:click=export>"💾 Exportar backup"</button>
                 <button class="btn sm" on:click=pick>"📂 Restaurar backup"</button>
                 <button class="btn sm danger" on:click=move |_| confirm_reset.set(true)>"Zerar progresso…"</button>
                 <button class="btn sm ghost" on:click=|_| tauri::call("reveal_data_dir", NoArgs {})>"Abrir pasta dos dados"</button>
             </div>
-            {move || pending.get().map(|i| {
-                let when = if i.at > 0.0 { michi_core::time::local(i.at).format("%d/%m/%Y %H:%M").to_string() } else { "data desconhecida".into() };
-                let what = format!(
-                    "Restaurar o backup de {when}{}? {} XP, {} dias de estudo, {} cartas SRS{}. Isso substitui o progresso atual.",
-                    if i.name.is_empty() { String::new() } else { format!(" ({})", i.name) },
-                    i.xp, i.days, i.cards,
-                    if i.desktop { ", agenda do app desktop" } else { "" }
-                );
-                view! {
-                    <div class="banner warn"><span class="bico">"⚠️"</span><div class="grow">{what}</div>
-                        <button class="btn sm danger" on:click=apply>"Restaurar"</button>
-                        <button class="btn sm ghost" on:click=move |_| pending.set(None)>"Cancelar"</button>
-                    </div>
-                }
-            })}
+            {restore_banner(pending)}
             {move || confirm_reset.get().then(|| view! {
                 <div class="banner warn"><span class="bico">"⚠️"</span>
-                    <div class="grow">"Zerar todo o progresso (SRS, jornada, registros)? As configurações ficam. Faça um backup antes."</div>
+                    <div class="grow">"Zerar todo o progresso (SRS, jornada, registros)? As configurações ficam. Antes, o Michi guarda uma cópia na pasta dos backups."</div>
                     <button class="btn sm danger" on:click=reset>"Zerar tudo"</button>
                     <button class="btn sm ghost" on:click=move |_| confirm_reset.set(false)>"Cancelar"</button>
                 </div>

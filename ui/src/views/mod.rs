@@ -5,6 +5,7 @@ pub mod agenda;
 pub mod ajustes;
 pub mod anki;
 pub mod avisos;
+pub mod dados;
 pub mod frases;
 pub mod hoje;
 pub mod imersao;

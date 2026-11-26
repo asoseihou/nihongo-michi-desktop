@@ -34,10 +34,23 @@ pub struct LoadAll {
     cards: Vec<(String, Card)>,
 }
 
+/// Everything the UI keeps in memory. Waits (a few seconds at most) for the
+/// first sync between PCs, so the window opens with the latest progress.
 #[tauri::command]
-pub fn load_all(db: State<'_, Db>) -> R<LoadAll> {
+pub async fn load_all(app: AppHandle) -> R<LoadAll> {
+    if let Some(k) = app.try_state::<crate::keeper::Keeper>() {
+        let ready = k.ready.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || ready.wait(crate::keeper::FIRST_SYNC_WAIT)).await;
+    }
+    let db = app.state::<Db>();
     let c = db.lock();
     Ok(LoadAll { docs: db::docs_all(&c)?, days: db::days_all(&c)?, cards: db::cards_all(&c)? })
+}
+
+fn poke_keeper(app: &AppHandle) {
+    if let Some(k) = app.try_state::<crate::keeper::Keeper>() {
+        k.poke();
+    }
 }
 
 #[tauri::command]
@@ -126,14 +139,19 @@ pub async fn backup_pick(app: AppHandle) -> R<Option<BackupInfo>> {
     Ok(Some(info))
 }
 
+/// Restores a backup. A safety copy of the current progress is saved first,
+/// and with the sync on the restored progress replaces the other PCs' too.
 #[tauri::command]
 pub fn backup_apply(app: AppHandle, db: State<'_, Db>, path: String) -> R<()> {
     let (j, _) = backup::inspect(&path)?;
     {
         let mut c = db.lock();
+        crate::autobackup::safety(&app, &c, "restaurar")?;
         backup::restore(&mut c, &j)?;
+        crate::pcsync::start_new_epoch(&c)?;
     }
     wake(&app);
+    poke_keeper(&app);
     Ok(())
 }
 
@@ -141,9 +159,12 @@ pub fn backup_apply(app: AppHandle, db: State<'_, Db>, path: String) -> R<()> {
 pub fn reset_progress(app: AppHandle, db: State<'_, Db>) -> R<()> {
     {
         let mut c = db.lock();
+        crate::autobackup::safety(&app, &c, "zerar")?;
         backup::reset_progress(&mut c)?;
+        crate::pcsync::start_new_epoch(&c)?;
     }
     wake(&app);
+    poke_keeper(&app);
     Ok(())
 }
 

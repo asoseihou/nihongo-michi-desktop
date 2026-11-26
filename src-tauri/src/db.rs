@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
 /// Migrations run in order; `PRAGMA user_version` records the last one.
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql"), include_str!("../migrations/0002_sync.sql")];
 
 pub type R<T> = Result<T, String>;
 
@@ -82,10 +82,15 @@ pub fn doc_get(c: &Connection, name: &str) -> Option<Value> {
 }
 
 pub fn doc_put(c: &Connection, name: &str, data: &Value) -> R<()> {
+    doc_put_at(c, name, data, now())
+}
+
+/// Same as `doc_put`, keeping the version of a record that came from another PC.
+pub fn doc_put_at(c: &Connection, name: &str, data: &Value, t: i64) -> R<()> {
     c.execute(
         "INSERT INTO docs(name,data,updated_at) VALUES(?1,?2,?3)
          ON CONFLICT(name) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
-        params![name, data.to_string(), now()],
+        params![name, data.to_string(), t],
     )
     .map_err(err)?;
     Ok(())
@@ -120,11 +125,15 @@ pub fn day_get(c: &Connection, key: &str) -> Option<DayDoc> {
 }
 
 pub fn day_put(c: &Connection, key: &str, data: &Value) -> R<()> {
+    day_put_at(c, key, data, now())
+}
+
+pub fn day_put_at(c: &Connection, key: &str, data: &Value, t: i64) -> R<()> {
     let typed: DayDoc = serde_json::from_value(data.clone()).unwrap_or_else(|_| DayDoc::new(key));
     c.execute(
         "INSERT INTO days(day,xp,minutes,data,updated_at) VALUES(?1,?2,?3,?4,?5)
          ON CONFLICT(day) DO UPDATE SET xp=excluded.xp, minutes=excluded.minutes, data=excluded.data, updated_at=excluded.updated_at",
-        params![key, typed.xp, typed.study_minutes(), data.to_string(), now()],
+        params![key, typed.xp, typed.study_minutes(), data.to_string(), t],
     )
     .map_err(err)?;
     Ok(())
@@ -158,6 +167,11 @@ pub fn cards_all(c: &Connection) -> R<Vec<(String, Card)>> {
 }
 
 pub fn card_put(c: &Connection, id: &str, card: Option<&Card>) -> R<()> {
+    card_put_at(c, id, card, now())
+}
+
+/// Saves (or deletes, leaving a tombstone) one SRS card.
+pub fn card_put_at(c: &Connection, id: &str, card: Option<&Card>, t: i64) -> R<()> {
     match card {
         Some(k) => {
             let a = k.0;
@@ -165,12 +179,14 @@ pub fn card_put(c: &Connection, id: &str, card: Option<&Card>) -> R<()> {
                 "INSERT INTO cards(id,due,ivl,ease,reps,lapses,state,step,updated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)
                  ON CONFLICT(id) DO UPDATE SET due=excluded.due, ivl=excluded.ivl, ease=excluded.ease, reps=excluded.reps,
                    lapses=excluded.lapses, state=excluded.state, step=excluded.step, updated_at=excluded.updated_at",
-                params![id, a[0], a[1], a[2], a[3], a[4], a[5] as i64, a[6], now()],
+                params![id, a[0], a[1], a[2], a[3], a[4], a[5] as i64, a[6], t],
             )
             .map_err(err)?;
+            tomb_del(c, "card", id)?;
         }
         None => {
             c.execute("DELETE FROM cards WHERE id=?1", [id]).map_err(err)?;
+            tomb_put(c, "card", id, t)?;
         }
     }
     Ok(())
@@ -216,7 +232,10 @@ pub fn event_get(c: &Connection, id: &str) -> Option<Event> {
 }
 
 pub fn event_put(c: &Connection, e: &Event) -> R<()> {
-    let t = now();
+    event_put_at(c, e, now())
+}
+
+pub fn event_put_at(c: &Connection, e: &Event, t: i64) -> R<()> {
     c.execute(
         "INSERT INTO events(id,kind,title,jp,notes,all_day,date,time,dur,rrule,exdates,reminders,color,go,source,source_id,overrides,off,created_at,updated_at)
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?19)
@@ -248,26 +267,58 @@ pub fn event_put(c: &Connection, e: &Event) -> R<()> {
         ],
     )
     .map_err(err)?;
+    tomb_del(c, "event", &e.id)?;
     Ok(())
 }
 
 pub fn event_delete(c: &Connection, id: &str) -> R<()> {
+    event_delete_at(c, id, now())
+}
+
+pub fn event_delete_at(c: &Connection, id: &str, t: i64) -> R<()> {
     c.execute("DELETE FROM events WHERE id=?1", [id]).map_err(err)?;
     c.execute("DELETE FROM occ_done WHERE event_id=?1", [id]).map_err(err)?;
+    tomb_put(c, "event", id, t)?;
     Ok(())
 }
 
 pub fn occ_done_set(c: &Connection, event_id: &str, occ: &str, done: bool) -> R<()> {
+    occ_done_set_at(c, event_id, occ, done, now())
+}
+
+pub fn occ_done_set_at(c: &Connection, event_id: &str, occ: &str, done: bool, t: i64) -> R<()> {
+    let key = format!("{event_id}|{occ}");
     if done {
-        c.execute(
-            "INSERT OR REPLACE INTO occ_done(event_id,occ,done_at) VALUES(?1,?2,?3)",
-            params![event_id, occ, now()],
-        )
-        .map_err(err)?;
+        c.execute("INSERT OR REPLACE INTO occ_done(event_id,occ,done_at) VALUES(?1,?2,?3)", params![event_id, occ, t])
+            .map_err(err)?;
+        tomb_del(c, "occ", &key)?;
     } else {
         c.execute("DELETE FROM occ_done WHERE event_id=?1 AND occ=?2", params![event_id, occ]).map_err(err)?;
+        tomb_put(c, "occ", &key, t)?;
     }
     Ok(())
+}
+
+/* ---------------- tombstones (sync) ---------------- */
+
+pub fn tomb_put(c: &Connection, kind: &str, id: &str, at: i64) -> R<()> {
+    c.execute(
+        "INSERT INTO tombstones(kind,id,at) VALUES(?1,?2,?3) ON CONFLICT(kind,id) DO UPDATE SET at=excluded.at",
+        params![kind, id, at],
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+pub fn tomb_del(c: &Connection, kind: &str, id: &str) -> R<()> {
+    c.execute("DELETE FROM tombstones WHERE kind=?1 AND id=?2", params![kind, id]).map_err(err)?;
+    Ok(())
+}
+
+pub fn tombs(c: &Connection, kind: &str) -> R<Vec<(String, i64)>> {
+    let mut st = c.prepare("SELECT id, at FROM tombstones WHERE kind=?1").map_err(err)?;
+    let rows = st.query_map([kind], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).map_err(err)?;
+    Ok(rows.flatten().collect())
 }
 
 pub fn occ_done_between(c: &Connection, from: &str, to: &str) -> R<HashSet<(String, String)>> {

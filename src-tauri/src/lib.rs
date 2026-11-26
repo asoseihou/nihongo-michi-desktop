@@ -4,19 +4,24 @@
 
 mod agenda;
 mod agenda_cmd;
+mod autobackup;
 mod aviso;
 mod backup;
 mod commands;
+mod datacmd;
 mod db;
 mod events;
 mod files;
+mod keeper;
+mod local;
+mod pcsync;
 mod scheduler;
 mod sound;
 mod stt;
 mod sync;
 mod tray;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub fn run() {
@@ -32,12 +37,15 @@ pub fn run() {
             sync::sync_events(&db.lock()).map_err(std::io::Error::other)?;
             app.manage(db);
             app.manage(stt::Stt::default());
+            app.manage(pcsync::SyncState::default());
             tray::build(app.handle())?;
             // Started with Windows (`--hidden`): stay in the tray.
             if !std::env::args().any(|a| a == "--hidden") {
                 events::show_main(app.handle());
             }
-            scheduler::start(app.handle());
+            // First sync, then the reminder scheduler, then backups and sync
+            // in the background.
+            keeper::start(app.handle());
             Ok(())
         })
         .on_window_event(|w, e| {
@@ -45,6 +53,11 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = e {
                 api.prevent_close();
                 let _ = w.hide();
+                if w.label() == "main" {
+                    if let Some(k) = w.app_handle().try_state::<keeper::Keeper>() {
+                        k.hidden();
+                    }
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -64,6 +77,17 @@ pub fn run() {
             agenda_cmd::occ_skip,
             agenda_cmd::occ_move,
             agenda_cmd::agenda_export_ics,
+            datacmd::backup_auto_status,
+            datacmd::backup_auto_set,
+            datacmd::backup_auto_pick_dir,
+            datacmd::backup_auto_now,
+            datacmd::backup_inspect,
+            datacmd::open_folder,
+            datacmd::sync_status,
+            datacmd::sync_pick_dir,
+            datacmd::sync_join,
+            datacmd::sync_now,
+            datacmd::sync_off,
             commands::aviso_state,
             commands::aviso_fit,
             commands::aviso_action,
@@ -89,6 +113,14 @@ pub fn run() {
             stt::stt_cancel,
             stt::stt_download,
         ])
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar o Nihongo Michi");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar o Nihongo Michi")
+        .run(|app, ev| {
+            if let RunEvent::Exit = ev {
+                // Leave this PC's latest progress in the shared folder.
+                if let Err(e) = pcsync::push_only(app) {
+                    log::warn!("sync ao sair: {e}");
+                }
+            }
+        });
 }

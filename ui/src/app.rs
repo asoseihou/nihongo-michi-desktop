@@ -263,6 +263,42 @@ struct Navigate {
     block: Option<String>,
 }
 
+/// Sync between PCs, as the rail and the banner show it.
+#[derive(Deserialize, Clone, Debug, Default, PartialEq)]
+struct SyncLook {
+    on: bool,
+    #[serde(default)]
+    ok: bool,
+    #[serde(default)]
+    last_at: f64,
+    #[serde(default)]
+    pending: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct SyncStatusIn {
+    on: bool,
+    error: String,
+    last_at: f64,
+    pending: Vec<String>,
+}
+
+fn load_sync_look(sig: RwSignal<SyncLook>) {
+    spawn_local(async move {
+        if let Ok(s) = tauri::invoke::<SyncStatusIn, _>("sync_status", &tauri::NoArgs {}).await {
+            sig.set(SyncLook { on: s.on, ok: s.error.is_empty(), last_at: s.last_at, pending: s.pending });
+        }
+    });
+}
+
+/// Data changed outside the window (another PC's progress arrived).
+fn reload_from_backend() {
+    spawn_local(async {
+        crate::views::dados::reload_all().await;
+        refresh_unread();
+    });
+}
+
 fn install_global_handlers() {
     // [data-say] buttons inside HTML strings, and external links.
     let click = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(|ev: web_sys::MouseEvent| {
@@ -337,6 +373,8 @@ pub fn App() -> impl IntoView {
     NAV_REV.with(|c| c.set(Some(nav_rev)));
     TOASTS.with(|c| c.set(Some(toasts)));
 
+    let sync = RwSignal::new(SyncLook::default());
+    let syncing = RwSignal::new(false);
     let _ = window_event_listener(leptos::ev::hashchange, move |_| route.set(hash_route()));
     install_global_handlers();
     crate::tts::init();
@@ -346,6 +384,13 @@ pub fn App() -> impl IntoView {
         tauri::listen::<Navigate>("michi://navigate", |n| go(&n.route, intent_for_block(n.block.as_deref())));
         tauri::listen::<Value>("michi://avisos", |_| refresh_unread());
         tauri::listen::<Value>("michi://reload-desk", |_| spawn_local(store::reload_desk()));
+        tauri::listen::<Value>("michi://reload", move |_| {
+            reload_from_backend();
+            sync.update(|s| s.pending.clear());
+        });
+        tauri::listen::<Vec<String>>("michi://sync-pending", move |names| sync.update(|s| s.pending = names));
+        tauri::listen::<SyncLook>("michi://sync-status", move |look| sync.set(look));
+        load_sync_look(sync);
     }
 
     spawn_local(async move {
@@ -397,13 +442,50 @@ pub fn App() -> impl IntoView {
                 </div>
                 <nav class="nav">{nav_links}</nav>
                 <div class="rail-foot">
-                    <div class="sync cloud"><i></i>"Salvo neste PC"</div>
+                    {move || {
+                        let s = sync.get();
+                        let (cls, text) = if !s.on {
+                            ("sync cloud", "Salvo neste PC".to_string())
+                        } else if !s.ok {
+                            ("sync local", "Sincronização com erro".to_string())
+                        } else if s.last_at > 0.0 {
+                            ("sync cloud", format!("Sincronizado · {}", michi_core::time::hhmm(s.last_at)))
+                        } else {
+                            ("sync local", "Sincronizando…".to_string())
+                        };
+                        view! { <a class=cls href="#ajustes" title="Ajustes → Sincronizar entre PCs" on:click=move |ev: web_sys::MouseEvent| {
+                            ev.prevent_default();
+                            go("ajustes", Some(json!({"focus": "sincronizar"})));
+                        }><i></i>{text}</a> }
+                    }}
                     <div class="tiny faint">"KANJIDIC2 · KanjiVG · tanos (CC)"</div>
                 </div>
             </aside>
             <main class="main" id="main" tabindex="-1">
                 <div class="wrap">
                     <Topbar/>
+                    {move || {
+                        let names = sync.get().pending;
+                        (!names.is_empty()).then(|| view! {
+                            <div class="banner line sync-banner">
+                                <span class="bico">"🔄"</span>
+                                <div class="grow small">{format!("Chegou progresso de {}. Ele entra quando você fechar a janela, ou agora:", names.join(", "))}</div>
+                                <button class="btn sm primary" disabled=move || syncing.get() on:click=move |_| {
+                                    syncing.set(true);
+                                    spawn_local(async move {
+                                        match crate::views::dados::sync_now().await {
+                                            Ok(_) => {
+                                                sync.update(|s| s.pending.clear());
+                                                toast("Progresso do outro PC carregado.", "ok");
+                                            }
+                                            Err(e) => toast(&format!("Não consegui sincronizar: {e}"), "bad"),
+                                        }
+                                        syncing.set(false);
+                                    });
+                                }>"Atualizar agora"</button>
+                            </div>
+                        })
+                    }}
                     <div class="stack-lg" id="view">
                         {move || {
                             let r = route.get();

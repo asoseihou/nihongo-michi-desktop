@@ -220,10 +220,9 @@ fn doc_value(s: &mut Store, name: &str, now: f64) -> Option<Value> {
     v.ok()
 }
 
-/// Writes every dirty document and card now.
-pub fn flush() {
+fn take_dirty() -> (Vec<DocOut>, Vec<CardOut>) {
     let now = now_ms();
-    let (docs, cards) = S.with(|s| {
+    S.with(|s| {
         let mut s = s.borrow_mut();
         let names: Vec<String> = std::mem::take(&mut s.dirty).into_iter().collect();
         let mut docs = Vec::new();
@@ -235,21 +234,35 @@ pub fn flush() {
         let ids: Vec<String> = std::mem::take(&mut s.dirty_cards).into_iter().collect();
         let cards: Vec<CardOut> = ids.into_iter().map(|id| CardOut { card: s.cards.get(&id).copied(), id }).collect();
         (docs, cards)
-    });
+    })
+}
+
+async fn save(docs: Vec<DocOut>, cards: Vec<CardOut>) {
+    let r1 = if docs.is_empty() { Ok(()) } else { tauri::invoke::<(), _>("save_docs", &Items { items: docs }).await };
+    let r2 =
+        if cards.is_empty() { Ok(()) } else { tauri::invoke::<(), _>("save_cards", &Items { items: cards }).await };
+    if let Err(e) = r1.and(r2) {
+        if !ERROR_SHOWN.with(|c| c.replace(true)) {
+            crate::app::toast(&format!("Não consegui salvar ({e}). Tente de novo em instantes."), "bad");
+        }
+    }
+}
+
+/// Writes every dirty document and card now.
+pub fn flush() {
+    let (docs, cards) = take_dirty();
     if docs.is_empty() && cards.is_empty() {
         return;
     }
-    wasm_bindgen_futures::spawn_local(async move {
-        let r1 =
-            if docs.is_empty() { Ok(()) } else { tauri::invoke::<(), _>("save_docs", &Items { items: docs }).await };
-        let r2 =
-            if cards.is_empty() { Ok(()) } else { tauri::invoke::<(), _>("save_cards", &Items { items: cards }).await };
-        if let Err(e) = r1.and(r2) {
-            if !ERROR_SHOWN.with(|c| c.replace(true)) {
-                crate::app::toast(&format!("Não consegui salvar ({e}). Tente de novo em instantes."), "bad");
-            }
-        }
-    });
+    wasm_bindgen_futures::spawn_local(save(docs, cards));
+}
+
+/// Same as `flush`, finishing before it returns (before a sync).
+pub async fn flush_now() {
+    let (docs, cards) = take_dirty();
+    if !docs.is_empty() || !cards.is_empty() {
+        save(docs, cards).await;
+    }
 }
 
 #[derive(Deserialize)]
