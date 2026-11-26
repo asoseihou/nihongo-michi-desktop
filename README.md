@@ -16,6 +16,13 @@ WebView2, sem Electron) e interface em **Leptos** compilada para WebAssembly pel
   viagem de dezembro de 2028 aparecem como eventos de dia inteiro, coloridos por cidade.
   Marcar como feito pela agenda ou pelo aviso alimenta o quadro de Hoje, a sequência de
   dias e o mapa de calor.
+- **Modo foco**: o ▶ de cada bloco (ou o cartão em Hoje, ou o aviso) abre um cronômetro numa
+  janelinha sempre visível; os minutos entram no dia e cada 3 minutos dão 1 XP.
+- **Backup automático** diário (`Documentos\Nihongo Michi\Backups`) e cópia de segurança antes
+  de restaurar, zerar ou trazer o progresso de outro PC.
+- **Sincronizar entre PCs** por uma pasta compartilhada (OneDrive, Google Drive, Dropbox ou
+  pendrive): cada PC grava o próprio arquivo e lê o dos outros, e o progresso se junta sozinho.
+- **Atualização automática** pelas releases do GitHub, com o instalador assinado.
 
 Interface em português; o conteúdo de ensino segue em inglês + japonês.
 
@@ -39,6 +46,7 @@ para o seu usuário (sem administrador) e funciona no Windows 10/11 de 64 bits.
 | 2 | Demais telas: Jornada (estações, chefão, selos, Linha Viagem 2028), Revisar (SRS + ordem dos traços), 10 minigames, Frases (montar, partículas, raio-X, ditado, leituras, 🎤 Falar com Whisper local), Imersão, Anki | ✅ |
 | 3 | Agenda completa: mês, semana, dia e lista; repetição; vários lembretes; arrastar e redimensionar; exportar .ics | ✅ |
 | 4 | Instalador NSIS e releases no GitHub Actions | ✅ |
+| 0.2 | Backup automático, sincronização entre PCs, atualização automática e modo foco | ✅ |
 
 O **Sensei** (IA) fica fora da primeira versão.
 
@@ -87,12 +95,18 @@ cargo tauri build
 Cada tag `v*` enviada ao GitHub dispara o workflow **Release**, que compila no Windows e
 publica o instalador na página de Releases. O workflow **CI** roda os testes a cada push.
 
+O texto da release é a seção da versão em [NOVIDADES.md](NOVIDADES.md) (o app mostra essa parte
+depois de se atualizar). O instalador e o `latest.json` da atualização automática são assinados
+com a chave do projeto, guardada nos secrets `TAURI_SIGNING_PRIVATE_KEY` e
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` do repositório. A chave fica fora do repositório, em
+`%USERPROFILE%\.tauri`, e o `tools/dev-env.ps1` a carrega para o `cargo tauri build` local.
+
 ```powershell
-git tag v0.1.0
+git tag v0.2.0
 ```
 
 ```powershell
-git push origin v0.1.0
+git push origin v0.2.0
 ```
 
 ## Estrutura
